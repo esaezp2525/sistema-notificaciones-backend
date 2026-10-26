@@ -1,0 +1,12 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+whatsapp_session/
+*.zip
+node_modules/
+.system_generated/
+scratch/
+Thumbs.db
+.DS_Store

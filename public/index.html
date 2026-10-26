@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sistema de Notificaciones</title>
+  <link rel="icon" type="image/x-icon" href="/app_icon.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css?v=4">
+</head>
+<body>
+  <!-- OVERLAY DE INICIO DE SESIÓN -->
+  <div class="login-overlay" id="login-overlay">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-icon">🔔</div>
+        <h2>Sistema de Notificaciones</h2>
+        <p>Inicia sesión para acceder al panel de control</p>
+      </div>
+      <form id="form-login" class="login-form">
+        <div class="form-group">
+          <label for="login-username">Usuario</label>
+          <input type="text" id="login-username" class="form-input" placeholder="Ej: admin" required autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label for="login-password">Contraseña</label>
+          <input type="password" id="login-password" class="form-input" placeholder="••••••••" required autocomplete="current-password">
+        </div>
+        <div class="login-error-msg" id="login-error-msg" style="display: none;"></div>
+        <button type="submit" class="btn-login-submit" id="btn-login-submit">Iniciar Sesión</button>
+        <div class="login-footer">
+          <span>Acceso por defecto: <code>admin</code> / <code>admin123</code></span>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-layout" id="app-layout" style="display: none;">
+    <!-- BARRA SUPERIOR PRINCIPAL -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="brand-icon">🔔</div>
+        <div>
+          <h1 class="brand-title">Sistema de Notificaciones</h1>
+          <span class="brand-subtitle">Gestión y Automatización de Mensajes por WhatsApp</span>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- ESTADO DE WHATSAPP -->
+        <div class="wa-status-pill" id="wa-status-box">
+          <span class="status-dot" id="wa-status-dot"></span>
+          <span class="status-text" id="wa-status-text">WhatsApp: Verificando...</span>
+          <button type="button" class="btn-wa-header" id="btn-probar-wa">📲 Conectar</button>
+        </div>
+
+        <!-- ACCIONES RÁPIDAS -->
+        <button type="button" class="btn-top-action" id="btn-config-servidor" title="Configurar conexión con el motor de envíos">
+          ⚙️ Servidor
+        </button>
+        <button type="button" class="btn-top-action primary" id="btn-abrir-modal-enviar-ahora" title="Ejecutar un envío de inmediato">
+          🚀 Enviar Ahora
+        </button>
+        <button type="button" class="btn-top-action danger" id="btn-detener-envio" disabled title="Detener el proceso actual">
+          ⏹ Detener
+        </button>
+
+        <!-- SESIÓN DE USUARIO -->
+        <div class="user-session-pill" id="user-session-box">
+          <span class="user-avatar-icon">👤</span>
+          <div class="user-info-text">
+            <span class="user-name-display" id="user-current-name">Admin</span>
+            <span class="user-role-badge" id="user-current-role">Administrador</span>
+          </div>
+          <button type="button" class="btn-user-action" id="btn-modal-mi-clave" title="Cambiar mi contraseña">🔑</button>
+          <button type="button" class="btn-user-action danger" id="btn-cerrar-sesion" title="Cerrar Sesión">🚪</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- NAVEGACIÓN POR PESTAÑAS (TABS) -->
+    <nav class="app-nav-tabs">
+      <button type="button" class="nav-tab active" data-tab="tab-destinatarios">
+        <span class="tab-icon">👥</span>
+        <span class="tab-label">Destinatarios & Checklist</span>
+        <span class="tab-badge" id="badge-total-destinatarios">0</span>
+      </button>
+
+      <button type="button" class="nav-tab" data-tab="tab-notificaciones">
+        <span class="tab-icon">💬</span>
+        <span class="tab-label">Mensajes de Notificación</span>
+        <span class="tab-badge" id="badge-total-mensajes">0</span>
+      </button>
+
+      <button type="button" class="nav-tab" data-tab="tab-automatizaciones">
+        <span class="tab-icon">⏰</span>
+        <span class="tab-label">Automatizaciones (Días Hábiles)</span>
+        <span class="tab-badge" id="badge-total-autos">0</span>
+      </button>
+
+      <button type="button" class="nav-tab" data-tab="tab-consola">
+        <span class="tab-icon">📡</span>
+        <span class="tab-label">Consola de Transmisión</span>
+        <span class="tab-status-mini" id="mini-progress-status">Listo</span>
+      </button>
+
+      <!-- PESTAÑA EXCLUSIVA DE ADMINISTRADOR -->
+      <button type="button" class="nav-tab" data-tab="tab-usuarios" id="nav-tab-usuarios" style="display: none;">
+        <span class="tab-icon">🔐</span>
+        <span class="tab-label">Gestión de Usuarios</span>
+        <span class="tab-badge admin" id="badge-total-usuarios">1</span>
+      </button>
+    </nav>
+
+    <!-- CONTENEDOR PRINCIPAL DE PESTAÑAS -->
+    <main class="app-main-content">
+      
+      <!-- PESTAÑA 1: DESTINATARIOS Y CHECKLIST -->
+      <section class="tab-pane active" id="tab-destinatarios">
+        <div class="panel-card">
+          <!-- BARRA DE HERRAMIENTAS -->
+          <div class="toolbar-destinatarios">
+            <div class="toolbar-left">
+              <button type="button" class="btn-action primary" id="btn-nuevo-destinatario">
+                ➕ Agregar Destinatario
+              </button>
+              <button type="button" class="btn-action success" id="btn-abrir-modal-scan">
+                🔄 Escanear WhatsApp
+              </button>
+              <button type="button" class="btn-action outline" id="btn-reiniciar-estados">
+                ↺ Reiniciar Estados
+              </button>
+            </div>
+
+            <div class="toolbar-right">
+              <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filtro-destinatarios" placeholder="Buscar destinatario o grupo..." class="table-search">
+              </div>
+            </div>
+          </div>
+
+          <!-- RESUMEN DE TOTALES -->
+          <div class="kpi-banner">
+            <div class="kpi-item">
+              <span class="kpi-num" id="kpi-total">0</span>
+              <span class="kpi-label">Destinatarios Totales</span>
+            </div>
+            <div class="kpi-item active-kpi">
+              <span class="kpi-num" id="kpi-activos">0</span>
+              <span class="kpi-label">Activos</span>
+            </div>
+            <div class="kpi-item pending-kpi">
+              <span class="kpi-num" id="kpi-pendientes">0</span>
+              <span class="kpi-label">Pendientes</span>
+            </div>
+            <div class="kpi-item success-kpi">
+              <span class="kpi-num" id="kpi-enviados">0</span>
+              <span class="kpi-label">Enviados</span>
+            </div>
+            <div class="kpi-item error-kpi">
+              <span class="kpi-num" id="kpi-errores">0</span>
+              <span class="kpi-label">Incidencias</span>
+            </div>
+          </div>
+
+          <!-- TABLA DE DESTINATARIOS Y CHECKLIST -->
+          <div class="table-responsive">
+            <table class="data-table" id="tabla-destinatarios">
+              <thead>
+                <tr>
+                  <th style="width: 45px;">#</th>
+                  <th>Destinatario / Grupo</th>
+                  <th style="width: 100px;">Tipo</th>
+                  <th style="width: 90px; text-align: center;">Activo</th>
+                  <th>Automatizaciones Asignadas (Haz clic para activar/desactivar)</th>
+                  <th style="width: 120px;">Estado</th>
+                  <th style="width: 150px;">Fecha Envío</th>
+                  <th style="width: 100px; text-align: center;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-destinatarios">
+                <tr>
+                  <td colspan="8" class="empty-state-cell">Cargando base de datos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 2: MENSAJES DE NOTIFICACIÓN -->
+      <section class="tab-pane" id="tab-notificaciones">
+        <div class="panel-card">
+          <div class="toolbar-destinatarios">
+            <div>
+              <h2 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">Plantillas de Notificación</h2>
+              <p style="font-size: 13px; color: #64748b; margin: 0;">Crea cualquier cantidad de mensajes personalizados. Puedes usar variables como <code>{nombre}</code>, <code>{fecha}</code>, <code>{hora}</code>.</p>
+            </div>
+            <button type="button" class="btn-action primary" id="btn-nueva-notificacion">
+              ➕ Nueva Plantilla
+            </button>
+          </div>
+
+          <div class="cards-grid" id="grid-notificaciones">
+            <!-- Renderizado dinámico de tarjetas de mensaje -->
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 3: AUTOMATIZACIONES -->
+      <section class="tab-pane" id="tab-automatizaciones">
+        <div class="panel-card">
+          <div class="toolbar-destinatarios">
+            <div>
+              <h2 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">Automatizaciones Programadas</h2>
+              <p style="font-size: 13px; color: #64748b; margin: 0;">Configura reglas mensuales con soporte de <strong>Día Hábil</strong> (si el día cae fin de semana o festivo, se traslada al siguiente día hábil automáticamente).</p>
+            </div>
+            <button type="button" class="btn-action primary" id="btn-nueva-automatizacion">
+              ➕ Nueva Automatización
+            </button>
+          </div>
+
+          <div class="cards-grid" id="grid-automatizaciones">
+            <!-- Renderizado dinámico de tarjetas de automatizaciones -->
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 4: CONSOLA DE TRANSMISIÓN -->
+      <section class="tab-pane" id="tab-consola">
+        <div class="panel-card console-card">
+          <div class="console-header">
+            <div class="console-title">
+              <span class="live-dot"></span>
+              <strong>Terminal de Transmisión en Tiempo Real</strong>
+              <span class="active-task-badge" id="console-current-task" style="display: none;"></span>
+            </div>
+            <div class="console-controls">
+              <button type="button" class="btn-console-tool" id="btn-limpiar-consola">🧹 Limpiar</button>
+            </div>
+          </div>
+
+          <div class="terminal-body" id="terminal-body">
+            <!-- Logs en vivo -->
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA 5: GESTIÓN DE USUARIOS (SOLO ADMIN) -->
+      <section class="tab-pane" id="tab-usuarios">
+        <div class="panel-card">
+          <div class="toolbar-destinatarios">
+            <div>
+              <h2 style="font-size: 16px; font-weight: 600; color: #1e293b; margin-bottom: 4px;">Administración de Usuarios y Accesos</h2>
+              <p style="font-size: 13px; color: #64748b; margin: 0;">Gestiona los usuarios con acceso al sistema, crea nuevas cuentas o actualiza credenciales.</p>
+            </div>
+            <button type="button" class="btn-action primary" id="btn-abrir-modal-crear-usuario">
+              ➕ Crear Nuevo Usuario
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table" id="tabla-usuarios">
+              <thead>
+                <tr>
+                  <th style="width: 50px;">ID</th>
+                  <th>Usuario</th>
+                  <th>Nombre Completo</th>
+                  <th style="width: 140px;">Rol</th>
+                  <th style="width: 180px;">Fecha de Creación</th>
+                  <th style="width: 180px; text-align: center;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-usuarios">
+                <tr>
+                  <td colspan="6" class="empty-state-cell">Cargando usuarios...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ==================== MODALES ==================== -->
+
+  <!-- MODAL: DESTINATARIO -->
+  <div class="modal-backdrop" id="modal-destinatario">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-destinatario-titulo">Agregar Destinatario</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-dest">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="dest-id">
+        <div class="form-group">
+          <label for="dest-nombre">Nombre del Destinatario / Grupo exacto:</label>
+          <input type="text" id="dest-nombre" class="form-input" placeholder="Ej: Grupo Facturación o +569...">
+        </div>
+        <div class="form-group">
+          <label for="dest-tipo">Tipo:</label>
+          <select id="dest-tipo" class="form-input">
+            <option value="Grupo">Grupo de WhatsApp</option>
+            <option value="Contacto">Contacto Personal</option>
+          </select>
+        </div>
+        <div class="form-group checkbox-row">
+          <label class="custom-checkbox-label">
+            <input type="checkbox" id="dest-activo" checked>
+            <span>Habilitado para recibir envíos</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-dest">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-guardar-destinatario">Guardar Destinatario</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: NOTIFICACIÓN -->
+  <div class="modal-backdrop" id="modal-notificacion">
+    <div class="modal-box modal-large">
+      <div class="modal-header">
+        <h3 id="modal-notif-titulo">Nueva Plantilla de Mensaje</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-notif">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="notif-id">
+        <div class="form-group">
+          <label for="notif-input-titulo">Título / Asunto de la Plantilla:</label>
+          <input type="text" id="notif-input-titulo" class="form-input" placeholder="Ej: Recordatorio de Vencimiento">
+        </div>
+        <div class="form-group">
+          <label for="notif-input-cuerpo">Cuerpo del Mensaje (Soporta formato WhatsApp como *negrita* o _cursiva_):</label>
+          <textarea id="notif-input-cuerpo" class="form-textarea" rows="6" placeholder="Hola {nombre}, te recordamos que..."></textarea>
+          <div class="variables-tag-bar">
+            <span>Variables disponibles:</span>
+            <button type="button" class="tag-btn" onclick="insertarVariable('{nombre}')">{nombre}</button>
+            <button type="button" class="tag-btn" onclick="insertarVariable('{fecha}')">{fecha}</button>
+            <button type="button" class="tag-btn" onclick="insertarVariable('{hora}')">{hora}</button>
+            <button type="button" class="tag-btn" onclick="insertarVariable('{dia}')">{dia}</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-notif">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-guardar-notificacion">Guardar Mensaje</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AUTOMATIZACIÓN -->
+  <div class="modal-backdrop" id="modal-automatizacion">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="modal-auto-titulo">Configurar Automatización</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-auto">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="auto-id">
+        <div class="form-group">
+          <label for="auto-input-nombre">Nombre de la Automatización:</label>
+          <input type="text" id="auto-input-nombre" class="form-input" placeholder="Ej: Recordatorio Mensual (Día 4 Hábil)">
+        </div>
+        <div class="form-group">
+          <label for="auto-select-mensaje">Plantilla de Mensaje a Enviar:</label>
+          <select id="auto-select-mensaje" class="form-input">
+            <!-- Opciones dinámicas -->
+          </select>
+        </div>
+        <div class="form-row-2">
+          <div class="form-group">
+            <label for="auto-input-dia">Día del Mes (1 al 31):</label>
+            <input type="number" id="auto-input-dia" class="form-input" min="1" max="31" value="4">
+          </div>
+          <div class="form-group">
+            <label for="auto-input-hora">Hora de Envío (HH:MM):</label>
+            <input type="time" id="auto-input-hora" class="form-input" value="09:00">
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="auto-select-modalidad">Tipo de Cálculo del Día:</label>
+          <select id="auto-select-modalidad" class="form-input">
+            <option value="habil">Día Hábil (Si cae fin de semana o festivo, se envía el siguiente día hábil)</option>
+            <option value="calendario">Día Calendario (Se envía estrictamente en el número de día fijado)</option>
+          </select>
+        </div>
+        <div class="form-group checkbox-row">
+          <label class="custom-checkbox-label">
+            <input type="checkbox" id="auto-check-repetir" checked>
+            <span>Repetir automáticamente todos los meses</span>
+          </label>
+        </div>
+        <div class="form-group checkbox-row">
+          <label class="custom-checkbox-label">
+            <input type="checkbox" id="auto-check-activo" checked>
+            <span>Automatización Activa</span>
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-auto">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-guardar-automatizacion">Guardar Regla</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR USUARIO -->
+  <div class="modal-backdrop" id="modal-crear-usuario">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>➕ Crear Nuevo Usuario</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-user">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="new-user-username">Nombre de Usuario (Login):</label>
+          <input type="text" id="new-user-username" class="form-input" placeholder="Ej: operador1">
+        </div>
+        <div class="form-group">
+          <label for="new-user-nombre">Nombre Completo:</label>
+          <input type="text" id="new-user-nombre" class="form-input" placeholder="Ej: Juan Pérez">
+        </div>
+        <div class="form-group">
+          <label for="new-user-password">Contraseña:</label>
+          <input type="password" id="new-user-password" class="form-input" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label for="new-user-rol">Rol de Acceso:</label>
+          <select id="new-user-rol" class="form-input">
+            <option value="operador">Operador (Envío y Gestión)</option>
+            <option value="admin">Administrador (Acceso Total y Gestión de Usuarios)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-user">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-confirmar-crear-usuario">Crear Usuario</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMBIAR MI CLAVE -->
+  <div class="modal-backdrop" id="modal-mi-clave">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>🔑 Cambiar Mi Contraseña</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-mi-clave">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="clave-actual">Contraseña Actual:</label>
+          <input type="password" id="clave-actual" class="form-input" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label for="clave-nueva">Nueva Contraseña:</label>
+          <input type="password" id="clave-nueva" class="form-input" placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label for="clave-confirmar">Confirmar Nueva Contraseña:</label>
+          <input type="password" id="clave-confirmar" class="form-input" placeholder="••••••••">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-mi-clave">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-confirmar-cambio-clave">Actualizar Contraseña</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CAMBIAR CLAVE DE OTRO USUARIO (ADMIN) -->
+  <div class="modal-backdrop" id="modal-admin-clave-user">
+    <div class="modal-box" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3>🔑 Cambiar Clave de Usuario</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-admin-clave">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="admin-target-user-id">
+        <p style="font-size: 13.5px; color: #475569; margin-bottom: 12px;">
+          Establece una nueva contraseña para el usuario: <strong id="admin-target-username"></strong>
+        </p>
+        <div class="form-group">
+          <label for="admin-nueva-clave">Nueva Contraseña:</label>
+          <input type="password" id="admin-nueva-clave" class="form-input" placeholder="••••••••">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-admin-clave">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-confirmar-admin-clave">Establecer Clave</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: ENVIAR AHORA -->
+  <div class="modal-backdrop" id="modal-enviar-ahora">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>🚀 Ejecutar Envío Ahora</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-envio">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13.5px; color: #475569; margin-bottom: 14px;">
+          Selecciona qué automatización deseas ejecutar de inmediato para sus destinatarios asignados:
+        </p>
+        <label for="select-enviar-auto">Automatización a Ejecutar:</label>
+        <select id="select-enviar-auto" class="form-input">
+          <!-- Opciones dinámicas -->
+        </select>
+        <p class="input-hint" id="enviar-auto-hint" style="margin-top: 8px;">
+          Se enviará a todos los destinatarios que tengan marcada esta automatización y que se encuentren en estado 'Pendiente'.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-envio">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-confirmar-disparo">Iniciar Envíos</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIGURAR SERVIDOR BACKEND -->
+  <div class="modal-backdrop" id="modal-config-servidor">
+    <div class="modal-box" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3>⚙️ Conexión con Motor de Envíos</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-servidor">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13.5px; color: #475569; margin-bottom: 14px;">
+          Esta aplicación web se conecta a tu motor de WhatsApp para ejecutar los envíos y escanear contactos.
+        </p>
+        <div class="form-group">
+          <label for="input-api-url">Dirección URL del Servidor / API:</label>
+          <input type="text" id="input-api-url" class="form-input" placeholder="http://127.0.0.1:5829 o IP de tu servidor">
+          <p class="input-hint">Por defecto en tu computadora es <code>http://127.0.0.1:5829</code>.</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-servidor">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-guardar-api-url">Guardar Conexión</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CONFIRMAR ELIMINACIÓN -->
+  <div class="modal-backdrop" id="modal-confirmar-eliminar">
+    <div class="modal-box" style="max-width: 420px; text-align: center;">
+      <div class="modal-body" style="padding: 26px 20px;">
+        <div style="font-size: 40px; margin-bottom: 12px;">🗑️</div>
+        <h3 id="modal-confirm-title" style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 6px;">¿Eliminar elemento?</h3>
+        <p id="modal-confirm-desc" style="font-size: 13px; color: #64748b; margin-bottom: 22px;">Esta acción no se puede deshacer.</p>
+        <div style="display: flex; gap: 10px; justify-content: center;">
+          <button type="button" class="btn-dialog secondary" id="btn-cancelar-confirmacion">Cancelar</button>
+          <button type="button" class="btn-dialog primary" id="btn-aceptar-confirmacion" style="background: linear-gradient(135deg, #ef4444, #dc2626); border-color: #ef4444; box-shadow: 0 2px 6px rgba(239, 68, 68, 0.35);">Sí, Eliminar</button>
+        </div>
+      </div>
+    </div>
+  <!-- MODAL: ESCANEAR QR WHATSAPP WEB DIRECTO -->
+  <div class="modal-backdrop" id="modal-qr-whatsapp">
+    <div class="modal-box" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <h3>📲 Vincular WhatsApp Web</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-qr">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 24px 20px;">
+        <div id="qr-loading-state" style="padding: 20px 0;">
+          <div class="spinner" style="margin: 0 auto 16px auto; width: 42px; height: 42px; border: 4px solid #e2e8f0; border-top-color: #2563eb; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+          <p id="qr-status-text" style="font-size: 13.5px; color: #475569; font-weight: 500;">Generando código QR seguro...</p>
+        </div>
+        <div id="qr-display-container" style="display: none; margin-bottom: 16px;">
+          <img id="qr-image-display" src="" alt="Código QR WhatsApp" style="width: 250px; height: 250px; border-radius: 12px; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.08); background: #ffffff; padding: 8px;">
+          <p style="font-size: 12.5px; color: #64748b; margin-top: 10px; line-height: 1.4;">
+            1. Abre WhatsApp en tu celular.<br>
+            2. Toca <strong>Menú (⋮)</strong> o <strong>Configuración</strong> &gt; <strong>Dispositivos vinculados</strong>.<br>
+            3. Toca <strong>Vincular un dispositivo</strong> y apunta tu cámara a este código.
+          </p>
+        </div>
+        <div id="qr-success-state" style="display: none; padding: 20px 0;">
+          <div style="font-size: 48px; margin-bottom: 10px;">✅</div>
+          <h4 style="font-size: 16px; font-weight: 700; color: #16a34a; margin-bottom: 6px;">¡WhatsApp Vinculado con Éxito!</h4>
+          <p style="font-size: 13px; color: #64748b;">Tu sesión en la nube está activa y lista para enviar.</p>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn-dialog secondary" id="btn-cancelar-modal-qr">Cerrar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-hub" id="toast-container"></div>
+
+  <script src="/app.js?v=4"></script>
+</body>
+</html>
