@@ -45,7 +45,7 @@ automation_state = {
 
 terminal_logs = []
 logs_lock = threading.Lock()
-whatsapp_autenticado = None
+whatsapp_autenticado = False
 
 def add_log(level, msg):
     with logs_lock:
@@ -137,6 +137,8 @@ def forzar_cierre_playwright():
                  "Get-Process chrome,msedge,chromium -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*whatsapp_session*' } | Stop-Process -Force"],
                 capture_output=True, timeout=8
             )
+        else:
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
     except Exception:
         pass
 
@@ -936,11 +938,6 @@ def qr_worker():
 @app.route("/api/whatsapp/status", methods=["GET"])
 def api_whatsapp_status():
     global whatsapp_autenticado
-    # Si la carpeta de sesión existe con archivos y no se marcó falso
-    if whatsapp_autenticado is None:
-        session_activa = os.path.exists(SESSION_DIR) and len(os.listdir(SESSION_DIR)) > 0
-        whatsapp_autenticado = session_activa
-
     return jsonify({
         "success": True,
         "authenticated": bool(whatsapp_autenticado),

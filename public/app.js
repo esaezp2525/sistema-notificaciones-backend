@@ -332,7 +332,12 @@ function abrirModalQR() {
       const res = await fetch(getApiEndpoint('/api/whatsapp/qr'));
       const data = await res.json();
 
-      if (data.authenticated) {
+      if (data.qr) {
+        if (qrImg) qrImg.src = data.qr;
+        if (loadingState) loadingState.style.display = 'none';
+        if (displayContainer) displayContainer.style.display = 'block';
+        if (successState) successState.style.display = 'none';
+      } else if (data.authenticated) {
         if (loadingState) loadingState.style.display = 'none';
         if (displayContainer) displayContainer.style.display = 'none';
         if (successState) successState.style.display = 'block';
@@ -342,12 +347,6 @@ function abrirModalQR() {
         showToast('¡WhatsApp vinculado exitosamente!', 'success');
         setTimeout(() => cerrarModal('modal-qr-whatsapp'), 3000);
         return;
-      }
-
-      if (data.qr) {
-        if (qrImg) qrImg.src = data.qr;
-        if (loadingState) loadingState.style.display = 'none';
-        if (displayContainer) displayContainer.style.display = 'block';
       } else if (data.status_text && statusText) {
         statusText.textContent = data.status_text;
       }
