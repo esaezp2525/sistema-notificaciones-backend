@@ -9,8 +9,10 @@ const STORAGE_KEY_AUTOS = 'notif_web_autos';
 const STORAGE_KEY_USERS = 'notif_web_users';
 const STORAGE_KEY_API = 'notif_web_api_url';
 
+const DEFAULT_CLOUD_API = 'https://sistema-notificaciones-backend.onrender.com';
+
 let currentUser = null;
-let apiUrl = localStorage.getItem(STORAGE_KEY_API) || '';
+let apiUrl = localStorage.getItem(STORAGE_KEY_API) || DEFAULT_CLOUD_API;
 let destinatariosData = [];
 let notificacionesData = [];
 let automatizacionesData = [];
@@ -278,13 +280,8 @@ function setupEventListeners() {
 let qrPollInterval = null;
 
 function getApiEndpoint(path) {
-  if (!apiUrl) {
-    if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
-      return path;
-    }
-    return `http://127.0.0.1:5829${path}`;
-  }
-  return `${apiUrl.replace(/\/+$/, '')}${path}`;
+  const base = apiUrl || DEFAULT_CLOUD_API;
+  return `${base.replace(/\/+$/, '')}${path}`;
 }
 
 async function verificarEstadoWhatsApp() {
