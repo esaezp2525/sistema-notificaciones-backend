@@ -12,7 +12,12 @@ const STORAGE_KEY_API = 'notif_web_api_url';
 const DEFAULT_CLOUD_API = 'https://sistema-notificaciones-backend.onrender.com';
 
 let currentUser = null;
-let apiUrl = localStorage.getItem(STORAGE_KEY_API) || DEFAULT_CLOUD_API;
+let savedApi = localStorage.getItem(STORAGE_KEY_API);
+if (!savedApi || (window.location.protocol === 'https:' && savedApi.startsWith('http:')) || savedApi.includes('127.0.0.1') || savedApi.includes('localhost')) {
+  savedApi = DEFAULT_CLOUD_API;
+  localStorage.setItem(STORAGE_KEY_API, DEFAULT_CLOUD_API);
+}
+let apiUrl = savedApi;
 let destinatariosData = [];
 let notificacionesData = [];
 let automatizacionesData = [];
@@ -280,7 +285,10 @@ function setupEventListeners() {
 let qrPollInterval = null;
 
 function getApiEndpoint(path) {
-  const base = apiUrl || DEFAULT_CLOUD_API;
+  let base = apiUrl || DEFAULT_CLOUD_API;
+  if (window.location.protocol === 'https:' && (base.startsWith('http:') || base.includes('127.0.0.1') || base.includes('localhost'))) {
+    base = DEFAULT_CLOUD_API;
+  }
   return `${base.replace(/\/+$/, '')}${path}`;
 }
 
