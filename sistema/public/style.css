@@ -816,6 +816,8 @@ body {
   background: var(--danger-bg);
   border-color: var(--danger-border);
   color: var(--danger);
+}
+
 /* BOTÓN TOGGLE SWITCH EN TABLA DESKTOP */
 .btn-toggle-switch {
   border: 1px solid transparent;
