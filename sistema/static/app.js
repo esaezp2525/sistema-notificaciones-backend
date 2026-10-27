@@ -10,6 +10,7 @@ const STORAGE_KEY_AUTOS = 'notif_web_autos';
 const STORAGE_KEY_USERS = 'notif_web_users';
 const STORAGE_KEY_API = 'notif_web_api_url';
 const STORAGE_KEY_EMPRESA = 'notif_empresa_activa';
+const STORAGE_KEY_PLANTILLAS = 'notif_web_plantillas';
 
 const DEFAULT_CLOUD_API = 'https://sistema-notificaciones-backend.onrender.com';
 
@@ -17,6 +18,57 @@ const EMPRESAS_CONFIG = {
   contidep: { id: 'contidep', nombre: 'Contidep', icon: '🏢', color: '#2563eb' },
   medcapital: { id: 'medcapital', nombre: 'Medcapital', icon: '🏥', color: '#10b981' }
 };
+
+const DEFAULT_PLANTILLAS_CHILENAS = [
+  {
+    id: 'plan_f29',
+    titulo: 'Recordatorio F29 - Declaración IVA Mensual (SII)',
+    categoria: 'Tributario / SII',
+    cuerpo: 'Estimados señores *{nombre}*,\n\nLes recordamos que se aproxima la fecha límite para la presentación y pago del *Formulario 29 (F29)* correspondiente al período tributario.\n\n📌 *Detalles del Proceso:*\n• Plazo límite de declaración y pago: *Día 20 del mes en curso* (vía SII con factura electrónica).\n• Estado actual: En proceso de conciliación contable de compras y ventas.\n\n⚠️ *Importante:* Si tienen facturas de compras o ventas pendientes de emisión o registro, favor remitirlas a la brevedad para calcular el monto exacto del IVA o remanente.\n\nQuedamos atentos ante cualquier duda.\n*Equipo de Asesoría Contable & Tributaria*'
+  },
+  {
+    id: 'plan_cierre_facturas',
+    titulo: 'Solicitud de Facturas y Documentos - Cierre Mensual',
+    categoria: 'Cierre Contable',
+    cuerpo: 'Estimados clientes de *{nombre}*,\n\nEsperando que tengan un excelente día, solicitamos enviar la documentación necesaria para efectuar el *Cierre Contable Mensual*:\n\n📋 *Documentación requerida:*\n1️⃣ Facturas de compras o gastos no reflejados en el Registro de Compras y Ventas (RCV).\n2️⃣ Boletas y comprobantes de gastos menores o rendiciones de caja chica.\n3️⃣ Cartolas bancarias del mes en formato Excel o PDF.\n4️⃣ Novedades de remuneraciones (días trabajados, licencias, horas extras).\n\n🗓️ *Plazo límite de entrega:* *Día 5 de este mes*.\n\n¡Agradecemos su colaboración para mantener su contabilidad al día y sin multas!'
+  },
+  {
+    id: 'plan_previred',
+    titulo: 'Aviso de Pago - Cotizaciones Previsionales (Previred)',
+    categoria: 'Laboral / Previred',
+    cuerpo: 'Aviso de Pago - Leyes Sociales y Cotizaciones Previsionales 🏢💼\n\nEstimado/a *{nombre}*,\n\nLes informamos que ya se encuentran calculadas las cotizaciones previsionales de los trabajadores correspondientes al mes anterior.\n\n⏰ *Plazo de Pago Previred:*\n• Pago electrónico: *Hasta el día 13 a las 13:45 hrs*.\n• Instituciones incluidas: AFP, Fonasa / Isapre, AFC, Mutual de Seguridad e IPS.\n\n🔔 *Recordatorio:* El no pago dentro del plazo genera multas e intereses por parte de la Dirección del Trabajo y las instituciones de previsión.\n\nFavor confirmar el pago remitiendo el comprobante una vez efectuado.'
+  },
+  {
+    id: 'plan_renta_f22',
+    titulo: 'Operación Renta - Declaraciones Juradas y Formulario 22',
+    categoria: 'Tributario / SII',
+    cuerpo: 'Operación Renta - Servicio de Impuestos Internos (SII) 📊🇨🇱\n\nEstimados *{nombre}*,\n\nLes informamos que se encuentra en curso el proceso anual de *Operación Renta*.\n\n📝 *Etapas y Fechas Clave:*\n• Declaraciones Juradas (Sueldos, Honorarios, Retiros y Rentas).\n• Presentación y validación del *Formulario 22 (F22)*.\n\nSolicitamos revisar los balances preliminares y certificados de retención adjuntos para proceder con la declaración formal ante el SII.\n\nSaludos cordiales,\n*Departamento Tributario*'
+  },
+  {
+    id: 'plan_patente',
+    titulo: 'Aviso de Vencimiento: Patente Municipal y Comercial',
+    categoria: 'Tributario / SII',
+    cuerpo: 'Aviso de Vencimiento: Patente Municipal y Comercial 🏛️\n\nEstimado cliente *{nombre}*,\n\nLes recordamos que corresponde el pago de la cuota de la *Patente Comercial* ante la Municipalidad respectiva.\n\n📍 *Puntos a considerar:*\n• Plazo de pago: *Antes del último día hábil de este mes*.\n• Modalidad: Pago en línea en el portal municipal o tesorería municipal.\n\nSi requieren el certificado de capital propio tributario o el cálculo emitido ante el SII, por favor contáctennos de inmediato.'
+  },
+  {
+    id: 'plan_honorarios',
+    titulo: 'Aviso de Cobro de Honorarios Mensuales Contables',
+    categoria: 'Cobranzas y Honorarios',
+    cuerpo: 'Estimados señores *{nombre}*,\n\nEsperando se encuentren muy bien, les remitimos el aviso de cobro por los servicios de *Asesoría Contable & Tributaria* del período actual.\n\n💼 *Detalle del Servicio:*\n• Período: Mes en curso\n• Servicios: Contabilidad general, declaraciones mensuales F29 y asesoría laboral.\n\n💳 *Datos de Transferencia:*\n• Banco: Banco Estado / Banco de Chile\n• Cuenta Corriente N°: [COLOCAR NÚMERO]\n• RUT: [COLOCAR RUT]\n• Email comprobantes: contabilidad@asesores.cl\n\nRogamos enviar el comprobante de transferencia para emitir la factura o boleta correspondiente. ¡Muchas gracias!'
+  },
+  {
+    id: 'plan_decorativos_emojis',
+    titulo: 'Plantilla Marco Decorativo Elegante con Emojis',
+    categoria: 'Solo Emojis y Decorativos',
+    cuerpo: '🌟━━━━━━━━━━━━━━━━━━━🌟\n       *AVISO IMPORTANTE*\n🌟━━━━━━━━━━━━━━━━━━━🌟\n\nHola *{nombre}*,\n\n📌 *ASUNTO:* [Escribe aquí el título de tu comunicado]\n\n━━━━━━━━━━━━━━━━━━━━━\n💬 *DETALLE:*\n• Punto 1: [Detalle del primer punto]\n• Punto 2: [Detalle del segundo punto]\n• Punto 3: [Detalle del tercer punto]\n\n⚠️ *FECHA LÍMITE:* [DD/MM/AAAA]\n━━━━━━━━━━━━━━━━━━━━━\n\nCualquier consulta quedamos atentos a tu disposición.\n\nAtentamente,\n*Asesoría Contable & Tributaria* 🤝'
+  },
+  {
+    id: 'plan_vineta_ejecutiva',
+    titulo: 'Plantilla Viñetas Ejecutivas y Separadores Limpios',
+    categoria: 'Solo Emojis y Decorativos',
+    cuerpo: '━━━ *NOTIFICACIÓN OFICIAL* ━━━\n\nEstimado/a *{nombre}*,\n\n🔹 *Concepto:* [Concepto o aviso contable]\n🔹 *Detalle:* [Descripción resumida]\n🔹 *Monto:* $ [Monto si aplica]\n🔹 *Estado:* Pendiente de confirmación\n\n⏳ *Fecha límite:* [Día y Hora]\n📎 *Enlace / Portal:* [Enlace opcional]\n\n━━━━━━━━━━━━━━━━━━━━━━\n_Por favor no responder a este mensaje automático._'
+  }
+];
 
 let currentEmpresa = localStorage.getItem(STORAGE_KEY_EMPRESA) || 'contidep';
 let currentUser = null;
@@ -30,8 +82,11 @@ let apiUrl = savedApi;
 let destinatariosData = [];
 let notificacionesData = [];
 let automatizacionesData = [];
+let plantillasData = [];
 let usuariosData = [];
 let searchQuery = '';
+let plantillaFiltroCategoria = 'todas';
+let plantillaSearchQuery = '';
 let pollInterval = null;
 let confirmActionCallback = null;
 let qrPollInterval = null;
@@ -108,6 +163,12 @@ function initDefaultStorage() {
       { id: 101, nombre: 'Grupo Avisos Medcapital', tipo: 'Grupo', activo: true, automatizaciones: ['auto_med_1'], estado: 'Pendiente', fecha: '' }
     ];
     localStorage.setItem(`${STORAGE_KEY_DEST}_medcapital`, JSON.stringify(initialMedDest));
+  // Plantillas por defecto
+  if (!localStorage.getItem(`${STORAGE_KEY_PLANTILLAS}_contidep`)) {
+    localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_contidep`, JSON.stringify(DEFAULT_PLANTILLAS_CHILENAS));
+  }
+  if (!localStorage.getItem(`${STORAGE_KEY_PLANTILLAS}_medcapital`)) {
+    localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_medcapital`, JSON.stringify(DEFAULT_PLANTILLAS_CHILENAS));
   }
 }
 
@@ -118,6 +179,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
   verificarSesion();
   iniciarPollingLogs();
+  initAsistenteChat();
 });
 
 // ==================== AUTENTICACIÓN ====================
@@ -234,6 +296,56 @@ function setupEventListeners() {
   document.getElementById('btn-cerrar-modal-notif')?.addEventListener('click', () => cerrarModal('modal-notificacion'));
   document.getElementById('btn-cancelar-modal-notif')?.addEventListener('click', () => cerrarModal('modal-notificacion'));
   document.getElementById('btn-guardar-notificacion')?.addEventListener('click', guardarNotificacion);
+
+  // Plantillas de Texto
+  document.getElementById('btn-nueva-plantilla')?.addEventListener('click', () => abrirModalPlantilla());
+  document.getElementById('btn-cerrar-modal-plantilla')?.addEventListener('click', () => cerrarModal('modal-plantilla'));
+  document.getElementById('btn-cancelar-modal-plantilla')?.addEventListener('click', () => cerrarModal('modal-plantilla'));
+  document.getElementById('btn-guardar-plantilla-modal')?.addEventListener('click', guardarPlantillaModal);
+
+  // Filtro de búsqueda y categorías de plantillas
+  document.getElementById('filtro-plantillas')?.addEventListener('input', (e) => {
+    plantillaSearchQuery = e.target.value.toLowerCase().trim();
+    renderPlantillas();
+  });
+
+  const catPills = document.querySelectorAll('#plantillas-category-filter .filter-pill');
+  catPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      catPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      plantillaFiltroCategoria = pill.getAttribute('data-cat') || 'todas';
+      renderPlantillas();
+    });
+  });
+
+  // Selector de plantilla base en modal de mensajes
+  document.getElementById('notif-select-plantilla-base')?.addEventListener('change', (e) => {
+    const pId = e.target.value;
+    if (!pId) return;
+    const p = plantillasData.find(x => String(x.id) === String(pId));
+    if (p) {
+      document.getElementById('notif-input-titulo').value = p.titulo;
+      document.getElementById('notif-input-cuerpo').value = p.cuerpo;
+      showToast(`Plantilla "${p.titulo}" cargada.`, 'info');
+    }
+  });
+
+  // Asistente IA Chat
+  document.getElementById('btn-asistente-enviar')?.addEventListener('click', () => enviarMensajeAsistente());
+  document.getElementById('asistente-chat-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      enviarMensajeAsistente();
+    }
+  });
+
+  document.querySelectorAll('.asistente-quick-chips .chip-prompt').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const promptType = chip.getAttribute('data-prompt');
+      enviarMensajeAsistente(promptType);
+    });
+  });
 
   document.getElementById('btn-nueva-automatizacion')?.addEventListener('click', () => abrirModalAutomatizacion());
   document.getElementById('btn-cerrar-modal-auto')?.addEventListener('click', () => cerrarModal('modal-automatizacion'));
@@ -534,9 +646,14 @@ async function cargarDatos() {
         destinatariosData = data.destinatarios || [];
         notificacionesData = data.notificaciones || [];
         automatizacionesData = data.automatizaciones || [];
+        plantillasData = data.plantillas || [];
+        if (plantillasData.length === 0) {
+          plantillasData = [...DEFAULT_PLANTILLAS_CHILENAS];
+        }
         localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
         localStorage.setItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`, JSON.stringify(notificacionesData));
         localStorage.setItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`, JSON.stringify(automatizacionesData));
+        localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`, JSON.stringify(plantillasData));
         actualizarUI();
         return;
       }
@@ -548,6 +665,11 @@ async function cargarDatos() {
   destinatariosData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_DEST) || '[]');
   notificacionesData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_MSGS) || '[]');
   automatizacionesData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_AUTOS) || '[]');
+  plantillasData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_PLANTILLAS) || '[]');
+  if (plantillasData.length === 0) {
+    plantillasData = [...DEFAULT_PLANTILLAS_CHILENAS];
+    localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`, JSON.stringify(plantillasData));
+  }
   actualizarUI();
 }
 
@@ -555,6 +677,8 @@ function actualizarUI() {
   document.getElementById('badge-total-destinatarios').textContent = destinatariosData.length;
   document.getElementById('badge-total-mensajes').textContent = notificacionesData.length;
   document.getElementById('badge-total-autos').textContent = automatizacionesData.length;
+  const badgePlantillas = document.getElementById('badge-total-plantillas');
+  if (badgePlantillas) badgePlantillas.textContent = plantillasData.length;
 
   let pendientes = 0, enviados = 0, errores = 0, activos = 0;
   destinatariosData.forEach(d => {
@@ -572,7 +696,9 @@ function actualizarUI() {
 
   renderDestinatarios();
   renderNotificaciones();
+  renderPlantillas();
   renderAutomatizaciones();
+  actualizarSelectorPlantillasEnModalNotif();
 }
 
 // ==================== POLLING DE LOGS EN TIEMPO REAL ====================
@@ -1253,3 +1379,509 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+function formatWhatsAppPreview(text) {
+  if (!text) return '';
+  let safe = escapeHtml(text);
+  // Negrita: *texto*
+  safe = safe.replace(/\*([^\*]+)\*/g, '<strong>$1</strong>');
+  // Cursiva: _texto_
+  safe = safe.replace(/_([^_]+)_/g, '<em>$1</em>');
+  // Tachado: ~texto~
+  safe = safe.replace(/~([^~]+)~/g, '<del>$1</del>');
+  // Saltos de línea
+  safe = safe.replace(/\n/g, '<br>');
+  return safe;
+}
+
+// ==================== GESTIÓN DE PLANTILLAS ====================
+function renderPlantillas() {
+  const grid = document.getElementById('grid-plantillas');
+  if (!grid) return;
+
+  let filtradas = plantillasData;
+
+  if (plantillaFiltroCategoria && plantillaFiltroCategoria !== 'todas') {
+    filtradas = filtradas.filter(p => (p.categoria || '').toLowerCase() === plantillaFiltroCategoria.toLowerCase());
+  }
+
+  if (plantillaSearchQuery) {
+    filtradas = filtradas.filter(p => {
+      const tit = (p.titulo || '').toLowerCase();
+      const cue = (p.cuerpo || '').toLowerCase();
+      const cat = (p.categoria || '').toLowerCase();
+      return tit.includes(plantillaSearchQuery) || cue.includes(plantillaSearchQuery) || cat.includes(plantillaSearchQuery);
+    });
+  }
+
+  if (filtradas.length === 0) {
+    grid.innerHTML = `
+      <div style="grid-column: 1 / -1; padding: 40px 20px; text-align: center; color: #94a3b8;">
+        <div style="font-size: 38px; margin-bottom: 8px;">📋</div>
+        <p style="font-size: 14px; font-weight: 500; color: #64748b;">No se encontraron plantillas con este criterio.</p>
+        <button type="button" class="btn-action primary" style="margin-top: 10px;" onclick="abrirModalPlantilla()">➕ Crear Nueva Plantilla</button>
+      </div>
+    `;
+    return;
+  }
+
+  let html = '';
+  filtradas.forEach(p => {
+    let catClass = 'cat-general';
+    const cat = p.categoria || 'General';
+    if (cat.includes('Tributario')) catClass = 'cat-tributario';
+    else if (cat.includes('Laboral') || cat.includes('Previred')) catClass = 'cat-laboral';
+    else if (cat.includes('Cierre')) catClass = 'cat-cierre';
+    else if (cat.includes('Emojis') || cat.includes('Decorativos')) catClass = 'cat-decorativos';
+
+    html += `
+      <div class="notif-card" style="border-left: 4px solid var(--primary, #2563eb);">
+        <div class="card-top-row">
+          <h3 class="card-title">${escapeHtml(p.titulo)}</h3>
+          <span class="card-id-badge ${catClass}">${escapeHtml(cat)}</span>
+        </div>
+        <div class="card-preview-body" style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-family: system-ui, -apple-system, sans-serif; font-size: 12.5px; line-height: 1.5; color: #1e293b;">
+          ${formatWhatsAppPreview(p.cuerpo)}
+        </div>
+        <div class="card-actions-line" style="margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px;">
+          <button type="button" class="btn-card-action" style="background: #eff6ff; color: #2563eb; font-weight: 600;" onclick="usarPlantillaComoMensaje('${p.id}')" title="Usar esta plantilla para redactar un mensaje">
+            ✉️ Usar en Mensaje
+          </button>
+          <button type="button" class="btn-card-action" onclick="copiarTextoPlantilla('${p.id}')" title="Copiar al portapapeles">
+            📋 Copiar
+          </button>
+          <button type="button" class="btn-card-action" onclick="editarPlantilla('${p.id}')">
+            ✏️ Editar
+          </button>
+          <button type="button" class="btn-card-action danger" onclick="eliminarPlantilla('${p.id}')">
+            🗑️
+          </button>
+        </div>
+      </div>
+    `;
+  });
+
+  grid.innerHTML = html;
+}
+
+window.abrirModalPlantilla = function(p = null) {
+  document.getElementById('plantilla-id').value = p ? p.id : '';
+  document.getElementById('plantilla-input-titulo').value = p ? p.titulo : '';
+  document.getElementById('plantilla-select-categoria').value = p ? p.categoria : 'Tributario / SII';
+  document.getElementById('plantilla-input-cuerpo').value = p ? p.cuerpo : '';
+  document.getElementById('modal-plantilla-titulo').textContent = p ? 'Editar Plantilla de Texto' : 'Nueva Plantilla de Texto';
+  abrirModal('modal-plantilla');
+};
+
+window.editarPlantilla = function(id) {
+  const p = plantillasData.find(x => String(x.id) === String(id));
+  if (p) abrirModalPlantilla(p);
+};
+
+window.eliminarPlantilla = function(id) {
+  const p = plantillasData.find(x => String(x.id) === String(id));
+  const titulo = p ? p.titulo : 'esta plantilla';
+  solicitarConfirmacion(
+    '¿Eliminar plantilla?',
+    `¿Estás seguro de que deseas eliminar la plantilla "${titulo}"?`,
+    async () => {
+      try {
+        await fetch(getApiEndpoint('/api/plantillas/eliminar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+      } catch (err) {
+        console.warn("Backend no disponible al eliminar plantilla:", err);
+      }
+      plantillasData = plantillasData.filter(x => String(x.id) !== String(id));
+      localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`, JSON.stringify(plantillasData));
+      showToast(`Plantilla "${titulo}" eliminada.`, 'info');
+      actualizarUI();
+    }
+  );
+};
+
+async function guardarPlantillaModal() {
+  const id = document.getElementById('plantilla-id').value;
+  const titulo = document.getElementById('plantilla-input-titulo').value.trim();
+  const categoria = document.getElementById('plantilla-select-categoria').value;
+  const cuerpo = document.getElementById('plantilla-input-cuerpo').value.trim();
+
+  if (!titulo) {
+    showToast('El título de la plantilla es requerido.', 'error');
+    return;
+  }
+  if (!cuerpo) {
+    showToast('El cuerpo de la plantilla no puede estar vacío.', 'error');
+    return;
+  }
+
+  try {
+    await fetch(getApiEndpoint('/api/plantillas/guardar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: id || undefined,
+        titulo,
+        categoria,
+        cuerpo,
+        empresa_id: currentEmpresa
+      })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al guardar plantilla:", err);
+  }
+
+  if (id) {
+    const p = plantillasData.find(x => String(x.id) === String(id));
+    if (p) {
+      p.titulo = titulo;
+      p.categoria = categoria;
+      p.cuerpo = cuerpo;
+    }
+  } else {
+    const newId = `plan_${Date.now()}`;
+    plantillasData.unshift({
+      id: newId,
+      titulo,
+      categoria,
+      cuerpo,
+      empresa_id: currentEmpresa
+    });
+  }
+
+  localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`, JSON.stringify(plantillasData));
+  showToast('Plantilla guardada con éxito.', 'success');
+  cerrarModal('modal-plantilla');
+  actualizarUI();
+}
+
+window.insertarVariablePlantilla = function(tag) {
+  const txt = document.getElementById('plantilla-input-cuerpo');
+  if (!txt) return;
+  const s = txt.selectionStart;
+  const e = txt.selectionEnd;
+  txt.value = txt.value.substring(0, s) + tag + txt.value.substring(e);
+  txt.focus();
+  txt.selectionStart = txt.selectionEnd = s + tag.length;
+};
+
+window.copiarTextoAlPortapapeles = function(texto) {
+  if (!texto) return;
+  navigator.clipboard.writeText(texto).then(() => {
+    showToast('Texto copiado al portapapeles 📋', 'success');
+  }).catch(() => {
+    // Fallback si no tiene permisos de clipboard
+    const el = document.createElement('textarea');
+    el.value = texto;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('Texto copiado al portapapeles 📋', 'success');
+  });
+};
+
+window.copiarTextoPlantilla = function(id) {
+  const p = plantillasData.find(x => String(x.id) === String(id));
+  if (p) window.copiarTextoAlPortapapeles(p.cuerpo);
+};
+
+window.usarPlantillaComoMensaje = function(id) {
+  const p = plantillasData.find(x => String(x.id) === String(id));
+  if (!p) return;
+  abrirModalNotificacion({
+    id: '',
+    titulo: p.titulo,
+    cuerpo: p.cuerpo
+  });
+  showToast(`Plantilla "${p.titulo}" cargada para crear mensaje.`, 'info');
+};
+
+function actualizarSelectorPlantillasEnModalNotif() {
+  const sel = document.getElementById('notif-select-plantilla-base');
+  if (!sel) return;
+
+  const currentVal = sel.value;
+  sel.innerHTML = '<option value="">-- Elige una plantilla contable o personalizada --</option>';
+
+  const grupos = {};
+  plantillasData.forEach(p => {
+    const cat = p.categoria || 'General';
+    if (!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(p);
+  });
+
+  Object.keys(grupos).forEach(cat => {
+    const optgroup = document.createElement('optgroup');
+    optgroup.label = cat;
+    grupos[cat].forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = p.id;
+      opt.textContent = p.titulo;
+      optgroup.appendChild(opt);
+    });
+    sel.appendChild(optgroup);
+  });
+
+  if (currentVal) sel.value = currentVal;
+}
+
+// ==================== ASISTENTE DE REDACCIÓN IA & CHAT ====================
+function initAsistenteChat() {
+  const stream = document.getElementById('asistente-messages-stream');
+  if (!stream) return;
+
+  if (stream.children.length === 0) {
+    const welcomeBubble = document.createElement('div');
+    welcomeBubble.className = 'chat-bubble assistant';
+    welcomeBubble.innerHTML = `
+      <div style="font-weight: 700; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+        <span>🤖 Asistente Tributario & WhatsApp</span>
+      </div>
+      <p style="margin: 0; line-height: 1.45;">
+        ¡Hola! 👋 Te ayudo a redactar plantillas contables para tus clientes en Chile (como <strong>F29 IVA</strong>, <strong>Previred</strong>, <strong>Cierre de facturas</strong>, <strong>Cobro de honorarios</strong>) o bien generar estructuras decorativas limpias con emojis.
+      </p>
+      <p style="margin: 6px 0 0 0; font-size: 11.5px; color: #64748b;">
+        👉 Elige un tema en los botones de arriba o escribe tu instrucción abajo. Puedes alternar entre <em>Mensaje Completo</em> o <em>Solo Decorativos</em>.
+      </p>
+    `;
+    stream.appendChild(welcomeBubble);
+  }
+}
+
+function agregarBurbujaUsuario(texto) {
+  const stream = document.getElementById('asistente-messages-stream');
+  if (!stream) return;
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble user';
+  bubble.textContent = texto;
+  stream.appendChild(bubble);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+function generarPlantillaConIA(promptText, modo) {
+  const p = promptText.toLowerCase();
+
+  // MODO: SOLO DECORATIVOS Y EMOJIS
+  if (modo === 'decorativos' || p.includes('solo decorativo') || p.includes('decorativo') || p.includes('solo emotes') || p.includes('emojis')) {
+    if (p.includes('alerta') || p.includes('urgente') || p.includes('importante')) {
+      return {
+        titulo: 'Marco de Alerta Importante con Emojis',
+        categoria: 'Solo Emojis y Decorativos',
+        cuerpo: '🚨━━━━━━━━━━━━━━━━━━━🚨\n       *COMUNICADO URGENTE*\n🚨━━━━━━━━━━━━━━━━━━━🚨\n\nHola *{nombre}*,\n\n⚠️ *ATENCIÓN:* [ESCRIBE AQUÍ EL MOTIVO DE LA ALERTA]\n\n━━━━━━━━━━━━━━━━━━━━━\n📌 *Puntos Clave:*\n• ❗ [Punto 1]: \n• ❗ [Punto 2]: \n\n⏳ *VENCE:* [DÍA / HORA]\n━━━━━━━━━━━━━━━━━━━━━\n\n_Por favor confirmar recepción de este aviso._',
+        explicacion: 'Plantilla de alto impacto visual con bordes de alerta y viñetas de exclamación.'
+      };
+    }
+
+    if (p.includes('cuadro') || p.includes('marco') || p.includes('borde')) {
+      return {
+        titulo: 'Marco Decorativo Clásico con Separadores',
+        categoria: 'Solo Emojis y Decorativos',
+        cuerpo: '┏━━━━━━━━━━━━━━━━━━━━┓\n  ✨ *AVISO OFICIAL* ✨\n┗━━━━━━━━━━━━━━━━━━━━┛\n\nEstimado/a *{nombre}*,\n\n🔹 *TEMA:* [ASUNTO DEL MENSAJE]\n\n━━━━━━━━━━━━━━━━━━━━━\n📋 *INFORMACIÓN:*\n👉 [Línea 1]\n👉 [Línea 2]\n👉 [Línea 3]\n\n📅 *FECHA COMPROMISO:* [FECHA]\n━━━━━━━━━━━━━━━━━━━━━\n\nSaludos atentos,\n*Asesoría Contable* 🤝',
+        explicacion: 'Estructura elegante tipo caja con esquinas Unicode y viñetas de mano señaladora.'
+      };
+    }
+
+    return {
+      titulo: 'Estructura Limpia con Viñetas y Separadores',
+      categoria: 'Solo Emojis y Decorativos',
+      cuerpo: '🌟━━━━━━━━━━━━━━━━━━━🌟\n        *AVISO IMPORTANTE*\n🌟━━━━━━━━━━━━━━━━━━━🌟\n\nHola *{nombre}*,\n\n📌 *ASUNTO:* [Escribe el título de tu mensaje]\n\n━━━━━━━━━━━━━━━━━━━━━\n💬 *DETALLE:*\n• 1️⃣ [Detalle número uno]\n• 2️⃣ [Detalle número dos]\n• 3️⃣ [Detalle número tres]\n\n⚠️ *FECHA LÍMITE:* [Día y Hora]\n━━━━━━━━━━━━━━━━━━━━━\n\nQuedamos atentos a cualquier duda o consulta.\n\n*Atentamente,* ✨',
+      explicacion: 'Diseño decorativo versátil con estrellas, viñetas numéricas y separadores simétricos.'
+    };
+  }
+
+  // MODO: MENSAJE COMPLETO
+  if (p.includes('f29') || p.includes('iva') || p.includes('sii')) {
+    return {
+      titulo: 'Recordatorio Declaración F29 IVA - SII Chile',
+      categoria: 'Tributario / SII',
+      cuerpo: 'Estimados señores *{nombre}*,\n\nLes recordamos que se aproxima la fecha límite para declarar y pagar el *Formulario 29 (F29)* del SII.\n\n📌 *Detalles Tributarios:*\n• Período: Mes en curso\n• Plazo máximo: *Día 20 a las 23:59 hrs* (con factura electrónica)\n• Estado: En revisión de compras, ventas y boletas de honorarios.\n\n⚠️ *Acción requerida:* Si tienen facturas de compras o ventas pendientes de emisión, favor emitirlas o enviarlas hoy mismo para que queden incluidas en la propuesta.\n\nAtentamente,\n*Equipo Contable & Tributario*',
+      explicacion: 'Plantilla formal de F29 IVA adaptada a la normativa del Servicio de Impuestos Internos (SII).'
+    };
+  }
+
+  if (p.includes('previred') || p.includes('cotizacion') || p.includes('sueldo') || p.includes('leyes sociales')) {
+    return {
+      titulo: 'Aviso de Pago Previred y Leyes Sociales',
+      categoria: 'Laboral / Previred',
+      cuerpo: 'Aviso Importante: Pago de Cotizaciones Previsionales 🏢💼\n\nEstimado/a *{nombre}*,\n\nLes informamos que la nómina de cotizaciones previsionales del mes anterior ya está cargada en *Previred*.\n\n⏰ *Plazo Vencimiento:*\n• Vence el *Día 13 a las 13:45 hrs* (pago electrónico).\n• Cobertura: AFP, Fonasa/Isapre, AFC, Mutual e IPS.\n\n🔔 *Recuerden:* Eviten multas e intereses por parte de la Dirección del Trabajo realizando el pago dentro del plazo legal.\n\nFavor enviar el comprobante de pago una vez realizado.\n*Departamento de Recursos Humanos & Contabilidad*',
+      explicacion: 'Recordatorio laboral para el pago de Previred con plazos legales exactos para Chile.'
+    };
+  }
+
+  if (p.includes('cierre') || p.includes('factura') || p.includes('documento') || p.includes('cartola')) {
+    return {
+      titulo: 'Solicitud de Facturas y Cartolas - Cierre Mensual',
+      categoria: 'Cierre Contable',
+      cuerpo: 'Estimados clientes de *{nombre}*,\n\nEsperando que tengan un excelente día, les solicitamos la documentación para realizar el *Cierre Contable del Mes*:\n\n📋 *Favor enviar antes del día 5:*\n1️⃣ Facturas de compras o gastos fuera del portal SII.\n2️⃣ Boletas y comprobantes menores o rendiciones de caja.\n3️⃣ Cartola bancaria del mes en formato Excel o PDF.\n4️⃣ Novedades de sueldos (licencias, horas extras o retiros).\n\nCon esta información garantizamos balances al día y cálculos de impuestos exactos.\n\n¡Muchas gracias por su puntualidad!\n*Asesoría Contable*',
+      explicacion: 'Solicitud mensual de documentos comerciales, bancarios y laborales para cierre de mes.'
+    };
+  }
+
+  if (p.includes('honorarios') || p.includes('cobro') || p.includes('pago mensual') || p.includes('factura asesor')) {
+    return {
+      titulo: 'Aviso de Cobro de Honorarios de Asesoría Contable',
+      categoria: 'Cobranzas y Honorarios',
+      cuerpo: 'Estimados señores *{nombre}*,\n\nEsperando se encuentren muy bien, les enviamos el aviso de cobro por los servicios de *Asesoría Contable & Tributaria* de este mes.\n\n💼 *Detalle del Servicio:*\n• Asesoría contable integral, declaraciones F29 y soporte tributario continuo.\n\n💳 *Datos de Transferencia:*\n• Banco: [BANCO]\n• Tipo de Cuenta: Cuenta Corriente\n• N° de Cuenta: [NÚMERO]\n• RUT: [RUT]\n• Email de Comprobantes: pagos@asesores.cl\n\nPor favor remitir el comprobante para la emisión de la boleta o factura exenta correspondiente. ¡Agradecemos su confianza!',
+      explicacion: 'Mensaje cortés y profesional para cobro mensual de honorarios con datos bancarios listos para completar.'
+    };
+  }
+
+  if (p.includes('patente') || p.includes('municipal')) {
+    return {
+      titulo: 'Aviso de Vencimiento: Patente Municipal y Comercial',
+      categoria: 'Tributario / SII',
+      cuerpo: 'Aviso de Vencimiento: Patente Comercial 🏛️\n\nEstimado cliente *{nombre}*,\n\nLes recordamos que este mes corresponde el pago de la cuota de la *Patente Municipal* de su empresa.\n\n📍 *Puntos Clave:*\n• Plazo de vencimiento: *Último día hábil del mes*.\n• Pago en portal de la Municipalidad respectiva con el RUT de la empresa.\n\nSi la municipalidad les solicita el certificado de capital propio tributario emitido ante el SII, por favor avísennos para enviárselo de inmediato.\n\nSaludos atentos,\n*Asesoría Tributaria*',
+      explicacion: 'Aviso semestral para pago de patentes comerciales ante municipalidades chilenas.'
+    };
+  }
+
+  if (p.includes('renta') || p.includes('f22') || p.includes('dj') || p.includes('jurada')) {
+    return {
+      titulo: 'Operación Renta F22 y Declaraciones Juradas Anuales',
+      categoria: 'Tributario / SII',
+      cuerpo: 'Proceso Operación Renta - SII Chile 📊🇨🇱\n\nEstimados señores *{nombre}*,\n\nLes informamos que se encuentra abierto el proceso de *Operación Renta Anual*.\n\n📝 *Etapas del Proceso:*\n1️⃣ Declaraciones Juradas (Sueldos, Honorarios, Retiros y Rentas).\n2️⃣ Confección del Balance General y Determinación de Renta Líquida Imponible.\n3️⃣ Declaración y presentación del *Formulario 22 (F22)*.\n\nLes solicitamos coordinar una reunión o confirmar la información financiera preliminar enviada a su correo.\n\nAtentamente,\n*Equipo Tributario & Auditoría*',
+      explicacion: 'Plantilla completa para el proceso tributario anual de Renta en Chile.'
+    };
+  }
+
+  // Plantilla libre basada en la petición del usuario
+  const tituloLibre = promptText.length > 35 ? promptText.substring(0, 35) + '...' : promptText;
+  return {
+    titulo: `Plantilla: ${tituloLibre.charAt(0).toUpperCase() + tituloLibre.slice(1)}`,
+    categoria: 'General',
+    cuerpo: `Estimado/a *{nombre}*,\n\nEsperando que se encuentre muy bien, le contactamos desde el equipo contable:\n\n📌 *Asunto:* ${promptText}\n\n━━━━━━━━━━━━━━━━━━━━━\nℹ️ *Detalles importantes:*\n• Le solicitamos revisar la información adjunta.\n• Plazo de confirmación: Lo antes posible para evitar retrasos.\n\nQuedamos a su disposición ante cualquier duda o requerimiento.\n\nSaludos cordiales,\n*Asesoría Contable & Financiera* 🤝`,
+    explicacion: 'Plantilla personalizada generada según tu instrucción con estructura ejecutiva para WhatsApp.'
+  };
+}
+
+function agregarBurbujaAsistente(titulo, cuerpoWA, explicacion, categoria) {
+  const stream = document.getElementById('asistente-messages-stream');
+  if (!stream) return;
+
+  const bubble = document.createElement('div');
+  bubble.className = 'chat-bubble assistant';
+
+  const previewHtml = formatWhatsAppPreview(cuerpoWA);
+
+  bubble.innerHTML = `
+    <div style="font-weight: 700; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+      <span>🤖 ${escapeHtml(titulo)}</span>
+      <span class="card-id-badge cat-general" style="font-size: 10px;">${escapeHtml(categoria)}</span>
+    </div>
+    <p style="font-size: 11.5px; color: #64748b; margin: 0 0 8px 0;">${escapeHtml(explicacion)}</p>
+
+    <!-- VISTA PREVIA FORMATO WHATSAPP -->
+    <div class="wa-preview-card">
+      <div class="wa-bubble-inner">
+        ${previewHtml}
+      </div>
+      <div class="wa-bubble-time">${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} ✓✓</div>
+    </div>
+
+    <!-- BOTONES DE ACCIÓN RÁPIDA -->
+    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
+      <button type="button" class="btn-wa-action primary btn-guardar-ia">
+        💾 Guardar en Mis Plantillas
+      </button>
+      <button type="button" class="btn-wa-action btn-usar-ia">
+        ✉️ Usar en Mensaje
+      </button>
+      <button type="button" class="btn-wa-action btn-copiar-ia">
+        📋 Copiar
+      </button>
+    </div>
+  `;
+
+  // Listeners de los botones en la burbuja
+  bubble.querySelector('.btn-guardar-ia')?.addEventListener('click', () => {
+    guardarPlantillaGenerada(titulo, cuerpoWA, categoria);
+  });
+
+  bubble.querySelector('.btn-usar-ia')?.addEventListener('click', () => {
+    usarPlantillaGeneradaDirecto(titulo, cuerpoWA);
+  });
+
+  bubble.querySelector('.btn-copiar-ia')?.addEventListener('click', () => {
+    window.copiarTextoAlPortapapeles(cuerpoWA);
+  });
+
+  stream.appendChild(bubble);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+async function guardarPlantillaGenerada(titulo, cuerpo, categoria) {
+  const newId = `plan_ia_${Date.now()}`;
+  try {
+    await fetch(getApiEndpoint('/api/plantillas/guardar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: newId,
+        titulo,
+        categoria: categoria || 'General',
+        cuerpo,
+        empresa_id: currentEmpresa
+      })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al guardar plantilla IA:", err);
+  }
+
+  plantillasData.unshift({
+    id: newId,
+    titulo,
+    categoria: categoria || 'General',
+    cuerpo,
+    empresa_id: currentEmpresa
+  });
+  localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`, JSON.stringify(plantillasData));
+  showToast(`¡Plantilla "${titulo}" agregada a tu catálogo!`, 'success');
+  actualizarUI();
+}
+
+function usarPlantillaGeneradaDirecto(titulo, cuerpo) {
+  abrirModalNotificacion({
+    id: '',
+    titulo,
+    cuerpo
+  });
+  showToast('Plantilla cargada en el mensaje para enviar.', 'info');
+}
+
+function enviarMensajeAsistente(promptManual = null) {
+  const inputEl = document.getElementById('asistente-chat-input');
+  let promptText = '';
+
+  if (promptManual) {
+    if (promptManual === 'f29') promptText = 'Recordatorio F29 Declaración mensual de IVA en SII';
+    else if (promptManual === 'previred') promptText = 'Aviso de pago de cotizaciones previsionales en Previred';
+    else if (promptManual === 'cierre') promptText = 'Solicitud de facturas y cartolas para cierre contable mensual';
+    else if (promptManual === 'decorativos') promptText = 'Plantilla solo con marcos decorativos, separadores y emojis';
+    else if (promptManual === 'honorarios') promptText = 'Cobro formal de honorarios contables mensuales';
+    else if (promptManual === 'patente') promptText = 'Aviso de vencimiento de patente municipal comercial';
+    else if (promptManual === 'renta') promptText = 'Declaración anual Operación Renta F22 y balances';
+    else promptText = promptManual;
+  } else if (inputEl) {
+    promptText = inputEl.value.trim();
+  }
+
+  if (!promptText) {
+    showToast('Escribe una instrucción o haz clic en una sugerencia rápida.', 'info');
+    return;
+  }
+
+  const modoEl = document.querySelector('input[name="asistente-modo-salida"]:checked');
+  const modo = modoEl ? modoEl.value : 'completo';
+
+  agregarBurbujaUsuario(promptText + (modo === 'decorativos' ? ' (Modo: Solo decorativos)' : ''));
+  if (inputEl) inputEl.value = '';
+
+  const res = generarPlantillaConIA(promptText, modo);
+  setTimeout(() => {
+    agregarBurbujaAsistente(res.titulo, res.cuerpo, res.explicacion, res.categoria);
+  }, 200);
+}
+

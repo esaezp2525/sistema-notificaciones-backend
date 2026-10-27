@@ -604,6 +604,7 @@ def get_data():
         destinatarios = database.db_obtener_destinatarios(empresa_id=empresa)
         notificaciones = database.db_obtener_notificaciones(empresa_id=empresa)
         automatizaciones = database.db_obtener_automatizaciones(empresa_id=empresa)
+        plantillas = database.db_obtener_plantillas(empresa_id=empresa)
         empresas = database.db_obtener_empresas()
 
         totales = {"total": len(destinatarios), "pendientes": 0, "enviados": 0, "errores": 0, "activos": 0}
@@ -633,12 +634,55 @@ def get_data():
             "empresas": empresas,
             "notificaciones": notificaciones,
             "automatizaciones": automatizaciones,
+            "plantillas": plantillas,
             "destinatarios": destinatarios,
             "totales": totales,
             "session_activa": session_activa,
             "whatsapp_autenticado": bool(whatsapp_autenticado.get(empresa, False)),
             "is_running": automation_state["is_running"]
         })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==================== RUTAS DE PLANTILLAS REUTILIZABLES DE TEXTO ====================
+@app.route("/api/plantillas", methods=["GET"])
+def get_plantillas():
+    try:
+        empresa = request.args.get("empresa", "contidep").strip().lower()
+        plantillas = database.db_obtener_plantillas(empresa_id=empresa)
+        return jsonify({"success": True, "plantillas": plantillas})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/plantillas/guardar", methods=["POST"])
+def guardar_plantilla():
+    try:
+        data = request.get_json(silent=True) or {}
+        pid = data.get("id")
+        titulo = data.get("titulo", "").strip()
+        categoria = data.get("categoria", "Contabilidad").strip()
+        cuerpo = data.get("cuerpo", "").strip()
+        empresa = str(data.get("empresa_id") or data.get("empresa") or "contidep").strip().lower()
+
+        if not titulo or not cuerpo:
+            return jsonify({"success": False, "error": "El título y el cuerpo de la plantilla son obligatorios"}), 400
+
+        guardado_id = database.db_guardar_plantilla(pid, titulo, categoria, cuerpo, empresa_id=empresa)
+        add_log("info", f"[{empresa.title()}] Plantilla '{titulo}' guardada exitosamente ({guardado_id}).")
+        return jsonify({"success": True, "id": guardado_id, "message": "Plantilla guardada"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/plantillas/eliminar", methods=["POST"])
+def eliminar_plantilla():
+    try:
+        data = request.get_json(silent=True) or {}
+        pid = data.get("id")
+        if not pid:
+            return jsonify({"success": False, "error": "ID de plantilla requerido"}), 400
+        database.db_eliminar_plantilla(pid)
+        add_log("info", f"Plantilla ID '{pid}' eliminada.")
+        return jsonify({"success": True, "message": "Plantilla eliminada"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

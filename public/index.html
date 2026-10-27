@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=10">
+  <link rel="stylesheet" href="/style.css?v=11">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -101,6 +101,12 @@
         <span class="tab-icon">💬</span>
         <span class="tab-label">Mensajes de Notificación</span>
         <span class="tab-badge" id="badge-total-mensajes">0</span>
+      </button>
+
+      <button type="button" class="nav-tab" data-tab="tab-plantillas">
+        <span class="tab-icon">📋</span>
+        <span class="tab-label">Plantillas & Asistente IA</span>
+        <span class="tab-badge" id="badge-total-plantillas">0</span>
       </button>
 
       <button type="button" class="nav-tab" data-tab="tab-automatizaciones">
@@ -215,6 +221,92 @@
 
           <div class="cards-grid" id="grid-notificaciones">
             <!-- Renderizado dinámico de tarjetas de mensaje -->
+          </div>
+        </div>
+      </section>
+
+      <!-- PESTAÑA: PLANTILLAS DE TEXTO Y ASISTENTE IA -->
+      <section class="tab-pane" id="tab-plantillas">
+        <div class="panel-card" style="display: flex; flex-direction: column; height: 100%; overflow: hidden;">
+          <!-- BARRA DE HERRAMIENTAS DE PLANTILLAS -->
+          <div class="toolbar-destinatarios">
+            <div class="toolbar-left" style="gap: 8px;">
+              <button type="button" class="btn-action primary" id="btn-nueva-plantilla">
+                ➕ Nueva Plantilla
+              </button>
+              <div class="filter-pills-bar" id="plantillas-category-filter">
+                <button type="button" class="filter-pill active" data-cat="todas">Todas</button>
+                <button type="button" class="filter-pill" data-cat="Tributario / SII">📊 Tributario F29 / Renta</button>
+                <button type="button" class="filter-pill" data-cat="Laboral / Previred">💼 Previred Cotizaciones</button>
+                <button type="button" class="filter-pill" data-cat="Cierre Contable">📑 Cierre Facturas</button>
+                <button type="button" class="filter-pill" data-cat="Solo Emojis y Decorativos">✨ Decorativos y Emojis</button>
+              </div>
+            </div>
+
+            <div class="toolbar-right">
+              <div class="search-input-wrapper">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="filtro-plantillas" placeholder="Buscar en plantillas..." class="table-search">
+              </div>
+            </div>
+          </div>
+
+          <!-- CONTENEDOR DIVIDIDO: CATÁLOGO DE PLANTILLAS Y ASISTENTE IA -->
+          <div class="plantillas-split-container">
+            <!-- COLUMNA CATÁLOGO DE PLANTILLAS -->
+            <div class="plantillas-catalog-col">
+              <div class="cards-grid" id="grid-plantillas" style="padding: 14px;">
+                <!-- Tarjetas dinámicas de plantillas -->
+              </div>
+            </div>
+
+            <!-- COLUMNA ASISTENTE IA CHAT -->
+            <div class="asistente-chat-col">
+              <div class="asistente-chat-card">
+                <div class="asistente-header">
+                  <div class="asistente-avatar">🤖</div>
+                  <div>
+                    <h3 style="font-size: 13.5px; font-weight: 700; color: #ffffff; margin: 0;">Asistente de Redacción IA</h3>
+                    <span style="font-size: 11px; color: #4ade80;">● Redactor Contable & Emojis WhatsApp</span>
+                  </div>
+                </div>
+
+                <!-- SUGERENCIAS RÁPIDAS -->
+                <div class="asistente-quick-chips">
+                  <span style="font-size: 10.5px; color: #94a3b8; font-weight: 600; width: 100%;">💡 Elige un tema para redactar en 1 clic:</span>
+                  <button type="button" class="chip-prompt" data-prompt="f29">📌 F29 IVA Mensual</button>
+                  <button type="button" class="chip-prompt" data-prompt="previred">💰 Previred Cotizaciones</button>
+                  <button type="button" class="chip-prompt" data-prompt="cierre">📑 Facturas Cierre Mes</button>
+                  <button type="button" class="chip-prompt" data-prompt="decorativos">✨ Solo Decorativos y Emojis</button>
+                  <button type="button" class="chip-prompt" data-prompt="honorarios">👔 Cobro de Honorarios</button>
+                  <button type="button" class="chip-prompt" data-prompt="patente">🏛️ Patente Municipal</button>
+                  <button type="button" class="chip-prompt" data-prompt="renta">📊 Declaración Renta F22</button>
+                </div>
+
+                <!-- SELECTOR DE FORMATO -->
+                <div class="asistente-mode-bar">
+                  <label class="mode-radio">
+                    <input type="radio" name="asistente-modo-salida" value="completo" checked>
+                    <span>📝 Mensaje Completo</span>
+                  </label>
+                  <label class="mode-radio">
+                    <input type="radio" name="asistente-modo-salida" value="decorativos">
+                    <span>✨ Solo Decorativos & Emojis</span>
+                  </label>
+                </div>
+
+                <!-- HISTORIAL DE CHAT -->
+                <div class="asistente-messages-stream" id="asistente-messages-stream">
+                  <!-- Mensajes del asistente -->
+                </div>
+
+                <!-- INPUT DE CHAT -->
+                <div class="asistente-input-bar">
+                  <textarea id="asistente-chat-input" rows="2" placeholder="Escribe aquí tu petición (ej: 'aviso formal de cobro de honorarios')..." class="asistente-input"></textarea>
+                  <button type="button" id="btn-asistente-enviar" class="btn-asistente-send" title="Generar plantilla">🚀</button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -341,6 +433,17 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="notif-id">
+
+        <div class="form-group" style="background: #f8fafc; border: 1.5px dashed #cbd5e1; border-radius: var(--radius-md); padding: 12px; margin-bottom: 16px;">
+          <label for="notif-select-plantilla-base" style="font-weight: 700; color: #1e293b; display: flex; align-items: center; justify-content: space-between;">
+            <span>📋 Cargar plantilla de texto predefinida:</span>
+            <span style="font-size: 11px; font-weight: 500; color: #2563eb;">(Opcional)</span>
+          </label>
+          <select id="notif-select-plantilla-base" class="form-input" style="margin-top: 4px;">
+            <option value="">-- Elige una plantilla contable o personalizada --</option>
+          </select>
+        </div>
+
         <div class="form-group">
           <label for="notif-input-titulo">Título / Asunto de la Plantilla:</label>
           <input type="text" id="notif-input-titulo" class="form-input" placeholder="Ej: Recordatorio de Vencimiento">
@@ -360,6 +463,49 @@
       <div class="modal-footer">
         <button class="btn-dialog secondary" id="btn-cancelar-modal-notif">Cancelar</button>
         <button class="btn-dialog primary" id="btn-guardar-notificacion">Guardar Mensaje</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: CREAR / EDITAR PLANTILLA DE TEXTO -->
+  <div class="modal-backdrop" id="modal-plantilla">
+    <div class="modal-box modal-large">
+      <div class="modal-header">
+        <h3 id="modal-plantilla-titulo">📋 Plantilla de Texto</h3>
+        <button class="modal-close-btn" id="btn-cerrar-modal-plantilla">✕</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="plantilla-id">
+        <div class="form-group">
+          <label for="plantilla-input-titulo">Título / Nombre de la Plantilla:</label>
+          <input type="text" id="plantilla-input-titulo" class="form-input" placeholder="Ej: Recordatorio F29 IVA">
+        </div>
+        <div class="form-group">
+          <label for="plantilla-select-categoria">Categoría:</label>
+          <select id="plantilla-select-categoria" class="form-input">
+            <option value="Tributario / SII">📊 Tributario / SII (F29, Renta, IVA)</option>
+            <option value="Laboral / Previred">💼 Laboral / Previred (Cotizaciones, Sueldos)</option>
+            <option value="Cierre Contable">📑 Cierre Contable (Facturas, Bancos)</option>
+            <option value="Solo Emojis y Decorativos">✨ Solo Emojis y Decorativos</option>
+            <option value="Cobranzas y Honorarios">👔 Cobranzas y Honorarios</option>
+            <option value="General">📌 General</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="plantilla-input-cuerpo">Cuerpo del Mensaje (Soporta formato WhatsApp):</label>
+          <textarea id="plantilla-input-cuerpo" class="form-textarea" rows="8" placeholder="Escribe aquí el texto de la plantilla..."></textarea>
+          <div class="variables-tag-bar">
+            <span>Variables disponibles:</span>
+            <button type="button" class="tag-btn" onclick="insertarVariablePlantilla('{nombre}')">{nombre}</button>
+            <button type="button" class="tag-btn" onclick="insertarVariablePlantilla('{fecha}')">{fecha}</button>
+            <button type="button" class="tag-btn" onclick="insertarVariablePlantilla('{hora}')">{hora}</button>
+            <button type="button" class="tag-btn" onclick="insertarVariablePlantilla('{dia}')">{dia}</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-dialog secondary" id="btn-cancelar-modal-plantilla">Cancelar</button>
+        <button class="btn-dialog primary" id="btn-guardar-plantilla-modal">Guardar en Plantillas</button>
       </div>
     </div>
   </div>
@@ -609,6 +755,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=10"></script>
+  <script src="/app.js?v=11"></script>
 </body>
 </html>

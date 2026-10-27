@@ -32,6 +32,143 @@ def verify_password(password: str, hashed: str) -> bool:
     except Exception:
         return False
 
+# ==================== PLANTILLAS CHILENAS Y CONTABLES POR DEFECTO ====================
+PLANTILLAS_CHILENAS_DEFAULT = [
+    {
+        "id": "plan_f29",
+        "titulo": "Recordatorio F29 - Declaración IVA Mensual (SII)",
+        "categoria": "Tributario / SII",
+        "cuerpo": """Estimados señores *{nombre}*,
+
+Les recordamos que se aproxima la fecha límite para la presentación y pago del *Formulario 29 (F29)* correspondiente al período tributario.
+
+📌 *Detalles del Proceso:*
+• Plazo límite de declaración y pago: *Día 20 del mes en curso* (vía SII con factura electrónica).
+• Estado actual: En proceso de conciliación contable de compras y ventas.
+
+⚠️ *Importante:* Si tienen facturas de compras o ventas pendientes de emisión o registro, favor remitirlas a la brevedad para calcular el monto exacto del IVA o remanente.
+
+Quedamos atentos ante cualquier duda.
+*Equipo de Asesoría Contable & Tributaria*"""
+    },
+    {
+        "id": "plan_cierre_facturas",
+        "titulo": "Solicitud de Facturas y Documentos - Cierre Mensual",
+        "categoria": "Cierre Contable",
+        "cuerpo": """Estimados clientes de *{nombre}*,
+
+Esperando que tengan un excelente día, solicitamos enviar la documentación necesaria para efectuar el *Cierre Contable Mensual*:
+
+📋 *Documentación requerida:*
+1️⃣ Facturas de compras o gastos no reflejados en el Registro de Compras y Ventas (RCV).
+2️⃣ Boletas y comprobantes de gastos menores o rendiciones de caja chica.
+3️⃣ Cartolas bancarias del mes en formato Excel o PDF.
+4️⃣ Novedades de remuneraciones (días trabajados, licencias, horas extras).
+
+🗓️ *Plazo límite de entrega:* *Día 5 de este mes*.
+
+¡Agradecemos su colaboración para mantener su contabilidad al día y sin multas!"""
+    },
+    {
+        "id": "plan_previred",
+        "titulo": "Aviso de Pago - Cotizaciones Previsionales (Previred)",
+        "categoria": "Laboral / Previred",
+        "cuerpo": """Aviso de Pago - Leyes Sociales y Cotizaciones Previsionales 🏢💼
+
+Estimado/a *{nombre}*,
+
+Les informamos que ya se encuentran calculadas las cotizaciones previsionales de los trabajadores correspondientes al mes anterior.
+
+⏰ *Plazo de Pago Previred:*
+• Pago electrónico: *Hasta el día 13 a las 13:45 hrs*.
+• Instituciones incluidas: AFP, Fonasa / Isapre, AFC, Mutual de Seguridad e IPS.
+
+🔔 *Recordatorio:* El no pago dentro del plazo genera multas e intereses por parte de la Dirección del Trabajo y las instituciones de previsión.
+
+Favor confirmar el pago remitiendo el comprobante una vez efectuado."""
+    },
+    {
+        "id": "plan_renta_f22",
+        "titulo": "Operación Renta - Declaraciones Juradas y Formulario 22",
+        "categoria": "Tributario / SII",
+        "cuerpo": """Operación Renta - Servicio de Impuestos Internos (SII) 📊🇨🇱
+
+Estimados *{nombre}*,
+
+Les informamos que se encuentra en curso el proceso anual de *Operación Renta*.
+
+📝 *Etapas y Fechas Clave:*
+• Declaraciones Juradas (Sueldos, Honorarios, Retiros y Rentas).
+• Presentación y validación del *Formulario 22 (F22)*.
+
+Solicitamos revisar los balances preliminares y certificados de retención adjuntos para proceder con la declaración formal ante el SII.
+
+Saludos cordiales,
+*Departamento Tributario*"""
+    },
+    {
+        "id": "plan_patente",
+        "titulo": "Aviso de Vencimiento: Patente Municipal y Comercial",
+        "categoria": "Tributario / SII",
+        "cuerpo": """Aviso de Vencimiento: Patente Municipal y Comercial 🏛️
+
+Estimado cliente *{nombre}*,
+
+Les recordamos que corresponde el pago de la cuota de la *Patente Comercial* ante la Municipalidad respectiva.
+
+📍 *Puntos a considerar:*
+• Plazo de pago: *Antes del último día hábil de este mes*.
+• Modalidad: Pago en línea en el portal municipal o tesorería municipal.
+
+Si requieren el certificado de capital propio tributario o el cálculo emitido ante el SII, por favor contáctennos de inmediato."""
+    },
+    {
+        "id": "plan_decorativos_emojis",
+        "titulo": "Plantilla Marco Decorativo Elegante con Emojis",
+        "categoria": "Solo Emojis y Decorativos",
+        "cuerpo": """🌟━━━━━━━━━━━━━━━━━━━🌟
+       *AVISO IMPORTANTE*
+🌟━━━━━━━━━━━━━━━━━━━🌟
+
+Hola *{nombre}*,
+
+📌 *ASUNTO:* Escribe aquí el título de tu comunicado
+
+━━━━━━━━━━━━━━━━━━━━━
+💬 *DETALLE:*
+• Punto 1: 
+• Punto 2: 
+• Punto 3: 
+
+⚠️ *FECHA LÍMITE:* DD/MM/AAAA
+━━━━━━━━━━━━━━━━━━━━━
+
+Cualquier consulta quedamos atentos a tu disposición.
+
+Atentamente,
+*Asesoría Contable & Tributaria* 🤝"""
+    },
+    {
+        "id": "plan_vineta_ejecutiva",
+        "titulo": "Plantilla Viñetas Ejecutivas y Separadores Limpios",
+        "categoria": "Solo Emojis y Decorativos",
+        "cuerpo": """━━━ *NOTIFICACIÓN OFICIAL* ━━━
+
+Estimado/a *{nombre}*,
+
+🔹 *Concepto:* 
+🔹 *Detalle:* 
+🔹 *Monto:* $ 
+🔹 *Estado:* Pendiente de confirmación
+
+⏳ *Fecha límite:* 
+📎 *Enlace / Portal:* 
+
+━━━━━━━━━━━━━━━━━━━━━
+*Por favor confirmar recepción de este mensaje.*"""
+    }
+]
+
 # ==================== INICIALIZACIÓN Y MIGRACIÓN ====================
 def init_db():
     conn = get_db_connection()
@@ -104,9 +241,72 @@ def init_db():
         automatizacion_id TEXT,
         estado TEXT NOT NULL,
         fecha_hora TEXT NOT NULL,
-        detalle TEXT
+        detalle TEXT,
+        empresa_id TEXT DEFAULT 'contidep'
     )
     """)
+
+    # 7. Tabla de Empresas
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS empresas (
+        id TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        color TEXT DEFAULT '#2563eb'
+    )
+    """)
+    cursor.execute("INSERT OR IGNORE INTO empresas (id, nombre, color) VALUES ('contidep', 'Contidep', '#2563eb')")
+    cursor.execute("INSERT OR IGNORE INTO empresas (id, nombre, color) VALUES ('medcapital', 'Medcapital', '#10b981')")
+
+    # 8. Tabla de Plantillas Reutilizables de Texto
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS plantillas_texto (
+        id TEXT PRIMARY KEY,
+        titulo TEXT NOT NULL,
+        categoria TEXT NOT NULL DEFAULT 'Contabilidad',
+        cuerpo TEXT NOT NULL,
+        empresa_id TEXT DEFAULT 'contidep',
+        fecha_creacion TEXT NOT NULL
+    )
+    """)
+
+    # MIGRACIÓN: Asegurar columna empresa_id en todas las tablas
+    for tabla in ["destinatarios", "notificaciones", "automatizaciones", "historial_envios", "plantillas_texto"]:
+        cursor.execute(f"PRAGMA table_info({tabla})")
+        cols = [col["name"] for col in cursor.fetchall()]
+        if "empresa_id" not in cols:
+            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN empresa_id TEXT DEFAULT 'contidep'")
+
+    # Sembrar plantillas chilenas por defecto si la tabla está vacía
+    cursor.execute("SELECT COUNT(*) as count FROM plantillas_texto")
+    if cursor.fetchone()["count"] == 0:
+        now_str = datetime.now().strftime("%Y-%m-%d")
+        for emp in ["contidep", "medcapital"]:
+            for p in PLANTILLAS_CHILENAS_DEFAULT:
+                p_id = f"{p['id']}_{emp}"
+                cursor.execute(
+                    "INSERT OR IGNORE INTO plantillas_texto (id, titulo, categoria, cuerpo, empresa_id, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?)",
+                    (p_id, p["titulo"], p["categoria"], p["cuerpo"], emp, now_str)
+                )
+
+    # Sembrar datos para Medcapital si no existen
+    cursor.execute("SELECT COUNT(*) as count FROM notificaciones WHERE empresa_id = 'medcapital'")
+    if cursor.fetchone()["count"] == 0:
+        now_str = datetime.now().strftime("%Y-%m-%d")
+        cursor.execute(
+            "INSERT INTO notificaciones (id, titulo, cuerpo, fecha_creacion, empresa_id) VALUES (?, ?, ?, ?, ?)",
+            ("notif_med_1", "Recordatorio de Pago Medcapital", "Estimado/a {nombre}: Le recordamos gestionar su pago mensual con Medcapital.", now_str, "medcapital")
+        )
+        cursor.execute(
+            "INSERT INTO automatizaciones (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("auto_med_1", "Aviso Mensual Medcapital (Día 20)", "notif_med_1", 20, "calendario", "09:30", 1, 1, "", "medcapital")
+        )
+
+    cursor.execute("SELECT COUNT(*) as count FROM destinatarios WHERE empresa_id = 'medcapital'")
+    if cursor.fetchone()["count"] == 0:
+        cursor.execute(
+            "INSERT INTO destinatarios (nombre, tipo, activo, automatizaciones, estado_envio, fecha_envio, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("Grupo Avisos Medcapital", "Grupo", 1, "auto_med_1", "Pendiente", "", "medcapital")
+        )
 
     conn.commit()
 
@@ -253,17 +453,27 @@ def eliminar_usuario(user_id, req_user_id):
     conn.close()
     return True, "Usuario eliminado"
 
+def db_obtener_empresas():
+    return [
+        {"id": "contidep", "nombre": "Contidep", "color": "#2563eb"},
+        {"id": "medcapital", "nombre": "Medcapital", "color": "#10b981"}
+    ]
+
 # ==================== MÉTODOS DE DESTINATARIOS ====================
-def db_obtener_destinatarios():
+def db_obtener_destinatarios(empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM destinatarios ORDER BY id ASC")
+    if empresa_id:
+        cursor.execute("SELECT * FROM destinatarios WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM destinatarios ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     resultado = []
     for r in rows:
         aut_str = r["automatizaciones"] or ""
         aut_list = [x.strip() for x in aut_str.split(",") if x.strip()]
+        emp_id = r["empresa_id"] if "empresa_id" in r.keys() else "contidep"
         resultado.append({
             "id": r["id"],
             "nombre": r["nombre"],
@@ -271,30 +481,37 @@ def db_obtener_destinatarios():
             "activo": bool(r["activo"]),
             "automatizaciones": aut_list,
             "estado": r["estado_envio"] or "Pendiente",
-            "fecha": r["fecha_envio"] or ""
+            "fecha": r["fecha_envio"] or "",
+            "empresa_id": emp_id
         })
     return resultado
 
-def db_guardar_destinatario(nombre, tipo="Grupo", activo=True, auto_ids=None):
+def db_guardar_destinatario(nombre, tipo="Grupo", activo=True, auto_ids=None, empresa_id="contidep"):
     if auto_ids is None:
         auto_ids = []
     auto_str = ",".join(auto_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO destinatarios (nombre, tipo, activo, automatizaciones, estado_envio, fecha_envio) VALUES (?, ?, ?, ?, 'Pendiente', '')",
-        (nombre.strip(), tipo, 1 if activo else 0, auto_str)
+        "INSERT INTO destinatarios (nombre, tipo, activo, automatizaciones, estado_envio, fecha_envio, empresa_id) VALUES (?, ?, ?, ?, 'Pendiente', '', ?)",
+        (nombre.strip(), tipo, 1 if activo else 0, auto_str, empresa_id)
     )
     conn.commit()
     conn.close()
 
-def db_actualizar_destinatario(dest_id, nombre, tipo="Grupo", activo=True):
+def db_actualizar_destinatario(dest_id, nombre, tipo="Grupo", activo=True, empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE destinatarios SET nombre = ?, tipo = ?, activo = ? WHERE id = ?",
-        (nombre.strip(), tipo, 1 if activo else 0, dest_id)
-    )
+    if empresa_id:
+        cursor.execute(
+            "UPDATE destinatarios SET nombre = ?, tipo = ?, activo = ?, empresa_id = ? WHERE id = ?",
+            (nombre.strip(), tipo, 1 if activo else 0, empresa_id, dest_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE destinatarios SET nombre = ?, tipo = ?, activo = ? WHERE id = ?",
+            (nombre.strip(), tipo, 1 if activo else 0, dest_id)
+        )
     conn.commit()
     conn.close()
 
@@ -345,15 +562,18 @@ def db_sincronizar_a_excel():
         print(f"[DB] Error sincronizando a Excel: {e}")
 
 # ==================== MÉTODOS DE PLANTILLAS Y AUTOMATIZACIONES ====================
-def db_obtener_notificaciones():
+def db_obtener_notificaciones(empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM notificaciones ORDER BY id ASC")
+    if empresa_id:
+        cursor.execute("SELECT * FROM notificaciones WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM notificaciones ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def db_guardar_notificacion(nid, titulo, cuerpo):
+def db_guardar_notificacion(nid, titulo, cuerpo, empresa_id="contidep"):
     conn = get_db_connection()
     cursor = conn.cursor()
     if not nid:
@@ -367,8 +587,8 @@ def db_guardar_notificacion(nid, titulo, cuerpo):
     
     now_str = datetime.now().strftime("%Y-%m-%d")
     cursor.execute(
-        "INSERT OR REPLACE INTO notificaciones (id, titulo, cuerpo, fecha_creacion) VALUES (?, ?, ?, ?)",
-        (nid, titulo.strip(), cuerpo.strip(), now_str)
+        "INSERT OR REPLACE INTO notificaciones (id, titulo, cuerpo, fecha_creacion, empresa_id) VALUES (?, ?, ?, ?, ?)",
+        (nid, titulo.strip(), cuerpo.strip(), now_str, empresa_id)
     )
     conn.commit()
     conn.close()
@@ -382,10 +602,13 @@ def db_eliminar_notificacion(nid):
     conn.commit()
     conn.close()
 
-def db_obtener_automatizaciones():
+def db_obtener_automatizaciones(empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM automatizaciones ORDER BY id ASC")
+    if empresa_id:
+        cursor.execute("SELECT * FROM automatizaciones WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM automatizaciones ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     res = []
@@ -396,7 +619,7 @@ def db_obtener_automatizaciones():
         res.append(d)
     return res
 
-def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual):
+def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, empresa_id="contidep"):
     conn = get_db_connection()
     cursor = conn.cursor()
     if not aid:
@@ -409,9 +632,9 @@ def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, h
 
     cursor.execute(
         """INSERT OR REPLACE INTO automatizaciones 
-        (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT ultimo_envio_periodo FROM automatizaciones WHERE id = ?), ''))""",
-        (aid, nombre.strip(), mensaje_id, int(dia_mes), modalidad_dia, hora.strip(), 1 if activo else 0, 1 if repetir_mensual else 0, aid)
+        (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo, empresa_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT ultimo_envio_periodo FROM automatizaciones WHERE id = ?), ''), ?)""",
+        (aid, nombre.strip(), mensaje_id, int(dia_mes), modalidad_dia, hora.strip(), 1 if activo else 0, 1 if repetir_mensual else 0, aid, empresa_id)
     )
     conn.commit()
     conn.close()
@@ -436,3 +659,42 @@ def db_actualizar_periodo_auto(aid, periodo):
     cursor.execute("UPDATE automatizaciones SET ultimo_envio_periodo = ? WHERE id = ?", (periodo, aid))
     conn.commit()
     conn.close()
+
+# ==================== MÉTODOS DE PLANTILLAS REUTILIZABLES DE TEXTO ====================
+def db_obtener_plantillas(empresa_id=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if empresa_id:
+        cursor.execute("SELECT * FROM plantillas_texto WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM plantillas_texto ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def db_guardar_plantilla(pid, titulo, categoria, cuerpo, empresa_id="contidep"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if not pid:
+        cursor.execute("SELECT id FROM plantillas_texto")
+        existentes = [r["id"] for r in cursor.fetchall()]
+        num = 1
+        while f"plan_{num}" in existentes:
+            num += 1
+        pid = f"plan_{num}"
+    now_str = datetime.now().strftime("%Y-%m-%d")
+    cursor.execute(
+        "INSERT OR REPLACE INTO plantillas_texto (id, titulo, categoria, cuerpo, fecha_creacion, empresa_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (pid, titulo.strip(), categoria.strip() or "General", cuerpo.strip(), now_str, empresa_id)
+    )
+    conn.commit()
+    conn.close()
+    return pid
+
+def db_eliminar_plantilla(pid):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM plantillas_texto WHERE id = ?", (pid,))
+    conn.commit()
+    conn.close()
+

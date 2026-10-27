@@ -32,6 +32,143 @@ def verify_password(password: str, hashed: str) -> bool:
     except Exception:
         return False
 
+# ==================== PLANTILLAS CHILENAS Y CONTABLES POR DEFECTO ====================
+PLANTILLAS_CHILENAS_DEFAULT = [
+    {
+        "id": "plan_f29",
+        "titulo": "Recordatorio F29 - Declaración IVA Mensual (SII)",
+        "categoria": "Tributario / SII",
+        "cuerpo": """Estimados señores *{nombre}*,
+
+Les recordamos que se aproxima la fecha límite para la presentación y pago del *Formulario 29 (F29)* correspondiente al período tributario.
+
+📌 *Detalles del Proceso:*
+• Plazo límite de declaración y pago: *Día 20 del mes en curso* (vía SII con factura electrónica).
+• Estado actual: En proceso de conciliación contable de compras y ventas.
+
+⚠️ *Importante:* Si tienen facturas de compras o ventas pendientes de emisión o registro, favor remitirlas a la brevedad para calcular el monto exacto del IVA o remanente.
+
+Quedamos atentos ante cualquier duda.
+*Equipo de Asesoría Contable & Tributaria*"""
+    },
+    {
+        "id": "plan_cierre_facturas",
+        "titulo": "Solicitud de Facturas y Documentos - Cierre Mensual",
+        "categoria": "Cierre Contable",
+        "cuerpo": """Estimados clientes de *{nombre}*,
+
+Esperando que tengan un excelente día, solicitamos enviar la documentación necesaria para efectuar el *Cierre Contable Mensual*:
+
+📋 *Documentación requerida:*
+1️⃣ Facturas de compras o gastos no reflejados en el Registro de Compras y Ventas (RCV).
+2️⃣ Boletas y comprobantes de gastos menores o rendiciones de caja chica.
+3️⃣ Cartolas bancarias del mes en formato Excel o PDF.
+4️⃣ Novedades de remuneraciones (días trabajados, licencias, horas extras).
+
+🗓️ *Plazo límite de entrega:* *Día 5 de este mes*.
+
+¡Agradecemos su colaboración para mantener su contabilidad al día y sin multas!"""
+    },
+    {
+        "id": "plan_previred",
+        "titulo": "Aviso de Pago - Cotizaciones Previsionales (Previred)",
+        "categoria": "Laboral / Previred",
+        "cuerpo": """Aviso de Pago - Leyes Sociales y Cotizaciones Previsionales 🏢💼
+
+Estimado/a *{nombre}*,
+
+Les informamos que ya se encuentran calculadas las cotizaciones previsionales de los trabajadores correspondientes al mes anterior.
+
+⏰ *Plazo de Pago Previred:*
+• Pago electrónico: *Hasta el día 13 a las 13:45 hrs*.
+• Instituciones incluidas: AFP, Fonasa / Isapre, AFC, Mutual de Seguridad e IPS.
+
+🔔 *Recordatorio:* El no pago dentro del plazo genera multas e intereses por parte de la Dirección del Trabajo y las instituciones de previsión.
+
+Favor confirmar el pago remitiendo el comprobante una vez efectuado."""
+    },
+    {
+        "id": "plan_renta_f22",
+        "titulo": "Operación Renta - Declaraciones Juradas y Formulario 22",
+        "categoria": "Tributario / SII",
+        "cuerpo": """Operación Renta - Servicio de Impuestos Internos (SII) 📊🇨🇱
+
+Estimados *{nombre}*,
+
+Les informamos que se encuentra en curso el proceso anual de *Operación Renta*.
+
+📝 *Etapas y Fechas Clave:*
+• Declaraciones Juradas (Sueldos, Honorarios, Retiros y Rentas).
+• Presentación y validación del *Formulario 22 (F22)*.
+
+Solicitamos revisar los balances preliminares y certificados de retención adjuntos para proceder con la declaración formal ante el SII.
+
+Saludos cordiales,
+*Departamento Tributario*"""
+    },
+    {
+        "id": "plan_patente",
+        "titulo": "Aviso de Vencimiento: Patente Municipal y Comercial",
+        "categoria": "Tributario / SII",
+        "cuerpo": """Aviso de Vencimiento: Patente Municipal y Comercial 🏛️
+
+Estimado cliente *{nombre}*,
+
+Les recordamos que corresponde el pago de la cuota de la *Patente Comercial* ante la Municipalidad respectiva.
+
+📍 *Puntos a considerar:*
+• Plazo de pago: *Antes del último día hábil de este mes*.
+• Modalidad: Pago en línea en el portal municipal o tesorería municipal.
+
+Si requieren el certificado de capital propio tributario o el cálculo emitido ante el SII, por favor contáctennos de inmediato."""
+    },
+    {
+        "id": "plan_decorativos_emojis",
+        "titulo": "Plantilla Marco Decorativo Elegante con Emojis",
+        "categoria": "Solo Emojis y Decorativos",
+        "cuerpo": """🌟━━━━━━━━━━━━━━━━━━━🌟
+       *AVISO IMPORTANTE*
+🌟━━━━━━━━━━━━━━━━━━━🌟
+
+Hola *{nombre}*,
+
+📌 *ASUNTO:* Escribe aquí el título de tu comunicado
+
+━━━━━━━━━━━━━━━━━━━━━
+💬 *DETALLE:*
+• Punto 1: 
+• Punto 2: 
+• Punto 3: 
+
+⚠️ *FECHA LÍMITE:* DD/MM/AAAA
+━━━━━━━━━━━━━━━━━━━━━
+
+Cualquier consulta quedamos atentos a tu disposición.
+
+Atentamente,
+*Asesoría Contable & Tributaria* 🤝"""
+    },
+    {
+        "id": "plan_vineta_ejecutiva",
+        "titulo": "Plantilla Viñetas Ejecutivas y Separadores Limpios",
+        "categoria": "Solo Emojis y Decorativos",
+        "cuerpo": """━━━ *NOTIFICACIÓN OFICIAL* ━━━
+
+Estimado/a *{nombre}*,
+
+🔹 *Concepto:* 
+🔹 *Detalle:* 
+🔹 *Monto:* $ 
+🔹 *Estado:* Pendiente de confirmación
+
+⏳ *Fecha límite:* 
+📎 *Enlace / Portal:* 
+
+━━━━━━━━━━━━━━━━━━━━━
+*Por favor confirmar recepción de este mensaje.*"""
+    }
+]
+
 # ==================== INICIALIZACIÓN Y MIGRACIÓN ====================
 def init_db():
     conn = get_db_connection()
@@ -120,12 +257,36 @@ def init_db():
     cursor.execute("INSERT OR IGNORE INTO empresas (id, nombre, color) VALUES ('contidep', 'Contidep', '#2563eb')")
     cursor.execute("INSERT OR IGNORE INTO empresas (id, nombre, color) VALUES ('medcapital', 'Medcapital', '#10b981')")
 
+    # 8. Tabla de Plantillas Reutilizables de Texto
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS plantillas_texto (
+        id TEXT PRIMARY KEY,
+        titulo TEXT NOT NULL,
+        categoria TEXT NOT NULL DEFAULT 'Contabilidad',
+        cuerpo TEXT NOT NULL,
+        empresa_id TEXT DEFAULT 'contidep',
+        fecha_creacion TEXT NOT NULL
+    )
+    """)
+
     # MIGRACIÓN: Asegurar columna empresa_id en todas las tablas
-    for tabla in ["destinatarios", "notificaciones", "automatizaciones", "historial_envios"]:
+    for tabla in ["destinatarios", "notificaciones", "automatizaciones", "historial_envios", "plantillas_texto"]:
         cursor.execute(f"PRAGMA table_info({tabla})")
         cols = [col["name"] for col in cursor.fetchall()]
         if "empresa_id" not in cols:
             cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN empresa_id TEXT DEFAULT 'contidep'")
+
+    # Sembrar plantillas chilenas por defecto si la tabla está vacía
+    cursor.execute("SELECT COUNT(*) as count FROM plantillas_texto")
+    if cursor.fetchone()["count"] == 0:
+        now_str = datetime.now().strftime("%Y-%m-%d")
+        for emp in ["contidep", "medcapital"]:
+            for p in PLANTILLAS_CHILENAS_DEFAULT:
+                p_id = f"{p['id']}_{emp}"
+                cursor.execute(
+                    "INSERT OR IGNORE INTO plantillas_texto (id, titulo, categoria, cuerpo, empresa_id, fecha_creacion) VALUES (?, ?, ?, ?, ?, ?)",
+                    (p_id, p["titulo"], p["categoria"], p["cuerpo"], emp, now_str)
+                )
 
     # Sembrar datos para Medcapital si no existen
     cursor.execute("SELECT COUNT(*) as count FROM notificaciones WHERE empresa_id = 'medcapital'")
@@ -498,3 +659,42 @@ def db_actualizar_periodo_auto(aid, periodo):
     cursor.execute("UPDATE automatizaciones SET ultimo_envio_periodo = ? WHERE id = ?", (periodo, aid))
     conn.commit()
     conn.close()
+
+# ==================== MÉTODOS DE PLANTILLAS REUTILIZABLES DE TEXTO ====================
+def db_obtener_plantillas(empresa_id=None):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if empresa_id:
+        cursor.execute("SELECT * FROM plantillas_texto WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM plantillas_texto ORDER BY id ASC")
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def db_guardar_plantilla(pid, titulo, categoria, cuerpo, empresa_id="contidep"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if not pid:
+        cursor.execute("SELECT id FROM plantillas_texto")
+        existentes = [r["id"] for r in cursor.fetchall()]
+        num = 1
+        while f"plan_{num}" in existentes:
+            num += 1
+        pid = f"plan_{num}"
+    now_str = datetime.now().strftime("%Y-%m-%d")
+    cursor.execute(
+        "INSERT OR REPLACE INTO plantillas_texto (id, titulo, categoria, cuerpo, fecha_creacion, empresa_id) VALUES (?, ?, ?, ?, ?, ?)",
+        (pid, titulo.strip(), categoria.strip() or "General", cuerpo.strip(), now_str, empresa_id)
+    )
+    conn.commit()
+    conn.close()
+    return pid
+
+def db_eliminar_plantilla(pid):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM plantillas_texto WHERE id = ?", (pid,))
+    conn.commit()
+    conn.close()
+
