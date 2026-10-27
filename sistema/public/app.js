@@ -205,6 +205,9 @@ function verificarSesion() {
       }
 
       actualizarSelectorEmpresa();
+      const searchInput = document.getElementById('filtro-destinatarios');
+      if (searchInput) searchInput.value = '';
+      searchQuery = '';
       cargarDatos();
       verificarEstadoWhatsApp();
       return;

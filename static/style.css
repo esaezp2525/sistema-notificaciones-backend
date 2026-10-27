@@ -122,6 +122,13 @@ body {
   gap: 10px;
 }
 
+.header-status-bar,
+.header-actions-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* EMPRESA SELECTOR PILL */
 .empresa-selector-pill {
   display: flex;
@@ -1955,80 +1962,137 @@ body {
   }
 
   .header-right {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+
+  /* Fila 1 en móvil: Selector de Empresa y Estado de WhatsApp */
+  .header-status-bar {
+    display: flex;
+    align-items: center;
     gap: 6px;
     width: 100%;
   }
 
   .empresa-selector-pill {
-    grid-column: 1 / 2;
+    flex: 1;
+    min-width: 0;
     padding: 4px 8px;
-    min-height: 40px;
+    min-height: 38px;
+    border-radius: 12px;
     justify-content: flex-start;
+    box-sizing: border-box;
+  }
+
+  .empresa-selector-inner {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .empresa-selector-sub {
+    font-size: 9.5px;
+    letter-spacing: 0.2px;
   }
 
   .select-empresa-dropdown {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 700;
+    width: 100%;
+    max-width: 100%;
   }
 
   .wa-status-pill {
-    grid-column: 2 / 3;
+    flex: 1;
+    min-width: 0;
     padding: 4px 8px;
-    min-height: 40px;
+    min-height: 38px;
     font-size: 11px;
+    border-radius: 12px;
     justify-content: space-between;
+    box-sizing: border-box;
   }
 
   .wa-status-pill .status-text {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 80px;
+    max-width: 75px;
+    font-weight: 600;
   }
 
   .btn-wa-header {
-    padding: 4px 8px;
-    font-size: 11px;
+    padding: 3px 6px;
+    font-size: 10.5px;
     font-weight: 700;
+    flex-shrink: 0;
+    background: #eff6ff;
+    border-radius: 6px;
   }
 
-  .btn-top-action.primary {
-    grid-column: 1 / -1;
-    min-height: 42px;
-    font-size: 13px;
-    font-weight: 700;
-    justify-content: center;
-    border-radius: 8px;
-  }
-
-  .btn-top-action#btn-config-servidor {
-    grid-column: 1 / 2;
-    min-height: 36px;
-    font-size: 11.5px;
-    justify-content: center;
-  }
-
-  .btn-top-action.danger#btn-detener-envio {
-    grid-column: 2 / 3;
-    min-height: 36px;
-    font-size: 11.5px;
-    justify-content: center;
-  }
-
-  .user-session-pill {
+  /* Fila 2 en móvil: Enviar Ahora (destacado) y Acciones Rápidas */
+  .header-actions-bar {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 2px 6px;
+    width: 100%;
+  }
+
+  .btn-top-action.primary {
+    flex: 1;
+    min-height: 38px;
+    font-size: 13px;
+    font-weight: 700;
+    justify-content: center;
+    border-radius: 10px;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  }
+
+  .btn-top-action#btn-config-servidor {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  .btn-top-action.danger#btn-detener-envio {
+    flex: 0 0 auto;
+    min-height: 38px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+    justify-content: center;
+    border-radius: 10px;
+  }
+
+  .btn-top-action.danger#btn-detener-envio:disabled {
+    display: none;
+  }
+
+  .user-session-pill {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    min-height: 38px;
+    border-radius: 10px;
+  }
+
+  .user-avatar-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
   }
 
   .user-name-display {
-    font-size: 11.5px;
-    max-width: 80px;
+    font-size: 11px;
+    max-width: 44px;
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .user-role-badge {
@@ -2109,66 +2173,123 @@ body {
     padding: 10px;
   }
 
-  .toolbar-left {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 6px;
-    width: 100%;
-  }
-
-  #btn-nuevo-destinatario {
-    grid-column: 1 / -1;
-    justify-content: center;
-    padding: 12px;
-    font-size: 13.5px;
-    font-weight: 700;
-    min-height: 44px;
-    border-radius: 8px;
-  }
-
-  #btn-abrir-modal-scan, #btn-reiniciar-estados {
-    justify-content: center;
-    padding: 8px 6px;
-    font-size: 11.5px;
-    min-height: 40px;
-  }
-
   .toolbar-right {
     width: 100%;
+    order: 1;
   }
 
   .search-input-wrapper {
     width: 100%;
+    border-radius: 10px;
+    padding: 4px 12px;
+    background: #f8fafc;
+    border: 1.5px solid #cbd5e1;
+  }
+
+  .search-input-wrapper:focus-within {
+    border-color: #2563eb;
+    background: #ffffff;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
 
   .table-search {
     width: 100%;
-    min-height: 40px;
-    font-size: 13px;
+    min-height: 38px;
+    font-size: 13.5px;
   }
 
-  /* KPI Banner */
-  .kpi-banner {
-    grid-template-columns: repeat(2, 1fr);
+  .toolbar-left {
+    display: flex;
     gap: 6px;
-    padding: 8px;
+    width: 100%;
+    order: 2;
+    flex-wrap: wrap;
   }
 
-  .kpi-item:first-child {
-    grid-column: 1 / -1;
+  #btn-nuevo-destinatario {
+    flex: 1 1 100%;
+    justify-content: center;
+    padding: 10px 14px;
+    font-size: 13px;
+    font-weight: 700;
+    min-height: 42px;
+    border-radius: 10px;
   }
 
-  .kpi-item {
+  #btn-abrir-modal-scan {
+    flex: 1;
+    justify-content: center;
     padding: 8px 10px;
+    font-size: 11.5px;
+    min-height: 38px;
     border-radius: 8px;
   }
 
+  #btn-reiniciar-estados {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    min-height: 38px;
+    border-radius: 8px;
+  }
+
+  /* KPI Banner: Tira Horizontal con Desplazamiento Fluido en Móvil */
+  .kpi-banner {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border-color);
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .kpi-banner::-webkit-scrollbar {
+    display: none;
+  }
+
+  .kpi-item {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+
+  .kpi-item:first-child {
+    grid-column: auto;
+  }
+
+  .kpi-icon-badge {
+    width: 22px;
+    height: 22px;
+    font-size: 12px;
+    border-radius: 6px;
+  }
+
+  .kpi-text-box {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+  }
+
   .kpi-num {
-    font-size: 18px;
+    font-size: 14px;
+    font-weight: 800;
   }
 
   .kpi-label {
-    font-size: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748b;
+    margin: 0;
   }
 
   /* En móviles, ocultar la tabla de escritorio y mostrar tarjetas táctiles interactivas */

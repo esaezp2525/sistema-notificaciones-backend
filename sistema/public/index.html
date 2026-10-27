@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=16">
+  <link rel="stylesheet" href="/style.css?v=17">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -46,45 +46,50 @@
       </div>
 
       <div class="header-right">
-        <!-- SELECTOR DE EMPRESA -->
-        <div class="empresa-selector-pill" id="empresa-selector-box">
-          <span class="empresa-selector-icon" id="empresa-active-icon">🏢</span>
-          <div class="empresa-selector-inner">
-            <span class="empresa-selector-sub">Empresa Activa</span>
-            <select id="select-empresa-activa" class="select-empresa-dropdown" title="Selecciona la empresa para gestionar sus envíos y WhatsApp">
-              <option value="contidep" selected>🏢 Contidep</option>
-              <option value="medcapital">🏥 Medcapital</option>
-            </select>
+        <!-- BARRA 1: EMPRESA Y ESTADO WHATSAPP -->
+        <div class="header-status-bar">
+          <!-- SELECTOR DE EMPRESA -->
+          <div class="empresa-selector-pill" id="empresa-selector-box">
+            <span class="empresa-selector-icon" id="empresa-active-icon">🏢</span>
+            <div class="empresa-selector-inner">
+              <span class="empresa-selector-sub">Empresa Activa</span>
+              <select id="select-empresa-activa" class="select-empresa-dropdown" title="Selecciona la empresa para gestionar sus envíos y WhatsApp">
+                <option value="contidep" selected>🏢 Contidep</option>
+                <option value="medcapital">🏥 Medcapital</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- ESTADO DE WHATSAPP -->
+          <div class="wa-status-pill" id="wa-status-box">
+            <span class="status-dot" id="wa-status-dot"></span>
+            <span class="status-text" id="wa-status-text">WhatsApp: Verificando...</span>
+            <button type="button" class="btn-wa-header" id="btn-probar-wa">📲 Conectar</button>
           </div>
         </div>
 
-        <!-- ESTADO DE WHATSAPP -->
-        <div class="wa-status-pill" id="wa-status-box">
-          <span class="status-dot" id="wa-status-dot"></span>
-          <span class="status-text" id="wa-status-text">WhatsApp: Verificando...</span>
-          <button type="button" class="btn-wa-header" id="btn-probar-wa">📲 Conectar</button>
-        </div>
+        <!-- BARRA 2: ACCIONES RÁPIDAS Y SESIÓN -->
+        <div class="header-actions-bar">
+          <button type="button" class="btn-top-action primary" id="btn-abrir-modal-enviar-ahora" title="Ejecutar un envío de inmediato">
+            🚀 Enviar Ahora
+          </button>
+          <button type="button" class="btn-top-action" id="btn-config-servidor" title="Configurar conexión con el motor de envíos">
+            ⚙️ Servidor
+          </button>
+          <button type="button" class="btn-top-action danger" id="btn-detener-envio" disabled title="Detener el proceso actual">
+            ⏹ Detener
+          </button>
 
-        <!-- ACCIONES RÁPIDAS -->
-        <button type="button" class="btn-top-action" id="btn-config-servidor" title="Configurar conexión con el motor de envíos">
-          ⚙️ Servidor
-        </button>
-        <button type="button" class="btn-top-action primary" id="btn-abrir-modal-enviar-ahora" title="Ejecutar un envío de inmediato">
-          🚀 Enviar Ahora
-        </button>
-        <button type="button" class="btn-top-action danger" id="btn-detener-envio" disabled title="Detener el proceso actual">
-          ⏹ Detener
-        </button>
-
-        <!-- SESIÓN DE USUARIO -->
-        <div class="user-session-pill" id="user-session-box">
-          <span class="user-avatar-icon">👤</span>
-          <div class="user-info-text">
-            <span class="user-name-display" id="user-current-name">Admin</span>
-            <span class="user-role-badge" id="user-current-role">Administrador</span>
+          <!-- SESIÓN DE USUARIO -->
+          <div class="user-session-pill" id="user-session-box">
+            <span class="user-avatar-icon">👤</span>
+            <div class="user-info-text">
+              <span class="user-name-display" id="user-current-name">Admin</span>
+              <span class="user-role-badge" id="user-current-role">Administrador</span>
+            </div>
+            <button type="button" class="btn-user-action" id="btn-modal-mi-clave" title="Cambiar mi contraseña">🔑</button>
+            <button type="button" class="btn-user-action danger" id="btn-cerrar-sesion" title="Cerrar Sesión">🚪</button>
           </div>
-          <button type="button" class="btn-user-action" id="btn-modal-mi-clave" title="Cambiar mi contraseña">🔑</button>
-          <button type="button" class="btn-user-action danger" id="btn-cerrar-sesion" title="Cerrar Sesión">🚪</button>
         </div>
       </div>
     </header>
@@ -152,7 +157,7 @@
             <div class="toolbar-right">
               <div class="search-input-wrapper">
                 <span class="search-icon">🔍</span>
-                <input type="text" id="filtro-destinatarios" placeholder="Buscar destinatario o grupo..." class="table-search">
+                <input type="search" id="filtro-destinatarios" placeholder="Buscar destinatario o grupo..." class="table-search" autocomplete="off" autocorrect="off" spellcheck="false">
               </div>
             </div>
           </div>
@@ -782,6 +787,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=16"></script>
+  <script src="/app.js?v=17"></script>
 </body>
 </html>
