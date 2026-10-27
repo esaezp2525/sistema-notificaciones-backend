@@ -1,0 +1,93 @@
+{
+  "empresas": [
+    {
+      "id": "contidep",
+      "nombre": "Contidep",
+      "web": "https://contidep.cl",
+      "archivo_excel": "clientes_contidep.xlsx",
+      "archivo_mensaje": "mensaje_contidep.txt",
+      "programacion": {
+        "id": "prog_contidep_1",
+        "nombre": "Recordatorio Contidep",
+        "activo": false,
+        "repetir_mensual": false,
+        "dia_mes": 21,
+        "hora": "12:13",
+        "lista": "Todas",
+        "mensaje": "",
+        "ultimo_envio_periodo": "2026-10"
+      },
+      "listas": [
+        "General",
+        "lista 1",
+        "lista 2"
+      ],
+      "programaciones": [
+        {
+          "id": "prog_contidep_1",
+          "nombre": "Recordatorio Contidep",
+          "activo": true,
+          "repetir_mensual": false,
+          "dia_mes": 21,
+          "hora": "12:13",
+          "lista": "Todas",
+          "mensaje": "",
+          "ultimo_envio_periodo": ""
+        },
+        {
+          "id": "prog_1792615887553",
+          "nombre": "Recordatorio Automático",
+          "activo": true,
+          "dia_mes": 21,
+          "hora": "17:00",
+          "repetir_mensual": true,
+          "lista": "lista 1",
+          "mensaje": "",
+          "ultimo_envio_periodo": ""
+        },
+        {
+          "id": "prog_1792615916907",
+          "nombre": "Recordatorio Automático",
+          "activo": true,
+          "dia_mes": 21,
+          "hora": "17:52",
+          "repetir_mensual": true,
+          "lista": "lista 2",
+          "mensaje": "",
+          "ultimo_envio_periodo": "2026-10"
+        }
+      ]
+    },
+    {
+      "id": "medcapital",
+      "nombre": "Medcapital",
+      "web": "https://medcapital.cl",
+      "archivo_excel": "clientes_medcapital.xlsx",
+      "archivo_mensaje": "mensaje_medcapital.txt",
+      "programacion": {
+        "activo": false,
+        "dia_mes": 20,
+        "hora": "09:15",
+        "repetir_mensual": true,
+        "ultimo_envio_periodo": ""
+      },
+      "listas": [
+        "General"
+      ],
+      "programaciones": [
+        {
+          "id": "prog_medcapital_1",
+          "nombre": "Recordatorio Medcapital",
+          "activo": false,
+          "repetir_mensual": true,
+          "dia_mes": 20,
+          "hora": "09:15",
+          "lista": "Todas",
+          "mensaje": "",
+          "ultimo_envio_periodo": ""
+        }
+      ]
+    }
+  ],
+  "empresa_activa": "contidep"
+}

@@ -56,16 +56,20 @@ body {
   background-color: #f1f5f9;
   line-height: 1.5;
   overflow-x: hidden;
-  height: 100vh;
+  min-height: 100dvh;
+  height: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ==================== LAYOUT GENERAL ==================== */
 .app-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  min-height: 100dvh;
+  height: 100dvh;
   overflow: hidden;
 }
+
 
 /* ==================== CABECERA PRINCIPAL ==================== */
 .app-header {
@@ -1444,4 +1448,388 @@ body {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ========================================================
+   DISEÑO RESPONSIVO Y MOBILE-FIRST (SMARTPHONES Y TABLETS)
+   ======================================================== */
+
+@media (max-width: 860px) {
+  /* Evitar zoom automático indeseado en iOS */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Cabecera Principal */
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .header-brand {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .brand-title {
+    font-size: 14.5px;
+  }
+
+  .brand-subtitle {
+    display: none;
+  }
+
+  .brand-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .header-right {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .empresa-selector-pill {
+    flex: 1 1 auto;
+    min-width: 130px;
+    padding: 3px 8px;
+  }
+
+  .select-empresa-dropdown {
+    font-size: 12px;
+  }
+
+  .wa-status-pill {
+    flex: 1 1 auto;
+    min-width: 140px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    justify-content: center;
+  }
+
+  .btn-top-action {
+    flex: 1 1 auto;
+    padding: 7px 10px;
+    font-size: 11.5px;
+    justify-content: center;
+    min-height: 36px;
+  }
+
+  .btn-top-action.primary {
+    flex: 2 1 auto;
+    font-size: 12px;
+  }
+
+  .user-session-pill {
+    padding: 3px 6px;
+    gap: 6px;
+  }
+
+  .user-name-display {
+    font-size: 11.5px;
+  }
+
+  .user-role-badge {
+    display: none;
+  }
+
+  /* Pestañas de Navegación */
+  .app-nav-tabs {
+    padding: 0 8px;
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    background: #ffffff;
+    border-bottom: 2px solid var(--border-color);
+  }
+
+  .app-nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-tab {
+    padding: 10px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-height: 44px;
+    gap: 6px;
+  }
+
+  .tab-icon {
+    font-size: 15px;
+  }
+
+  .tab-badge {
+    font-size: 10.5px;
+    padding: 1px 6px;
+  }
+
+  /* Contenido Principal */
+  .app-main-content {
+    padding: 10px 8px;
+    overflow-y: auto;
+    flex-grow: 1;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .panel-card {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+    border-radius: var(--radius-md);
+  }
+
+  .tab-pane {
+    height: auto;
+    min-height: 100%;
+    overflow: visible;
+  }
+
+  /* Barra de Herramientas Destinatarios */
+  .toolbar-destinatarios {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .toolbar-left {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    width: 100%;
+  }
+
+  #btn-nuevo-destinatario {
+    grid-column: span 2;
+    justify-content: center;
+    padding: 10px;
+    font-size: 13px;
+    min-height: 42px;
+  }
+
+  #btn-abrir-modal-scan, #btn-reiniciar-estados {
+    justify-content: center;
+    padding: 8px;
+    font-size: 11.5px;
+    min-height: 38px;
+  }
+
+  .toolbar-right {
+    width: 100%;
+  }
+
+  .search-input-wrapper {
+    width: 100%;
+  }
+
+  .table-search {
+    width: 100%;
+  }
+
+  /* KPI Banner */
+  .kpi-banner {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .kpi-item:first-child {
+    grid-column: span 2;
+  }
+
+  .kpi-item {
+    padding: 8px 10px;
+  }
+
+  .kpi-num {
+    font-size: 18px;
+  }
+
+  .kpi-label {
+    font-size: 9.5px;
+  }
+
+  /* Tabla de Destinatarios */
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .data-table {
+    min-width: 620px;
+    font-size: 12px;
+  }
+
+  .data-table th, .data-table td {
+    padding: 8px 10px;
+  }
+
+  .data-table input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+  }
+
+  .auto-checklist-chips {
+    gap: 4px;
+  }
+
+  .auto-check-chip {
+    padding: 3px 8px;
+    font-size: 11px;
+    min-height: 28px;
+  }
+
+  /* Grid de Tarjetas (Mensajes y Automatizaciones) */
+  .cards-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .notif-card, .auto-card {
+    padding: 12px;
+  }
+
+  .card-actions-line {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .btn-card-action {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-height: 36px;
+    flex: 1 1 auto;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Consola de Transmisión */
+  .console-card {
+    height: auto;
+    min-height: 380px;
+  }
+
+  .console-header {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .terminal-body {
+    font-size: 11px;
+    padding: 10px;
+    min-height: 260px;
+    max-height: 50vh;
+  }
+
+  /* Modales en Móviles */
+  .modal-backdrop {
+    padding: 8px;
+    align-items: flex-end;
+  }
+
+  .modal-box {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - 16px);
+    border-radius: 16px 16px 0 0;
+    margin: 0;
+  }
+
+  .modal-header {
+    padding: 12px 16px;
+  }
+
+  .modal-body {
+    padding: 14px;
+    max-height: 65vh;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .btn-dialog {
+    width: 100%;
+    min-height: 44px;
+    text-align: center;
+    justify-content: center;
+    font-size: 13.5px;
+  }
+
+  .form-row-2 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  #qr-image-display {
+    max-width: 220px;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+
+  /* Toast en Móviles */
+  .toast-hub {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    align-items: center;
+  }
+
+  .toast {
+    max-width: 100%;
+    width: 100%;
+    font-size: 12px;
+    padding: 10px 14px;
+  }
+}
+
+/* Pantallas muy pequeñas (Teléfonos menores a 480px) */
+@media (max-width: 480px) {
+  .brand-title {
+    font-size: 13.5px;
+  }
+
+  .user-info-text {
+    display: none;
+  }
+
+  .empresa-selector-pill {
+    min-width: 110px;
+  }
+
+  .wa-status-pill {
+    min-width: 120px;
+    font-size: 11px;
+  }
+
+  .btn-top-action {
+    font-size: 11px;
+    padding: 6px 8px;
+  }
+
+  .login-card {
+    padding: 22px 16px;
+    width: 95%;
+  }
+
+  .login-header h2 {
+    font-size: 18px;
+  }
+}
+
 

@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: sistema-notificaciones-backend
+    env: docker
+    plan: free
+    region: ohio
+    dockerfilePath: Dockerfile
+    envVars:
+      - key: PORT
+        value: 5829
+      - key: HEADLESS
+        value: true

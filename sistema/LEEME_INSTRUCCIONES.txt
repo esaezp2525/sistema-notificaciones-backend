@@ -1,0 +1,26 @@
+============================================================
+   SISTEMA DE NOTIFICACIONES WHATSAPP
+============================================================
+
+INSTRUCCIONES PARA LA PERSONA QUE RECIBE ESTE ARCHIVO:
+
+1. Descomprime este archivo .ZIP en una carpeta de tu equipo
+   (por ejemplo en tu Escritorio o en Documentos).
+
+2. Haz doble clic en el archivo:
+   👉 "Instalar_en_otra_PC.bat"
+   
+   Esto instalará los componentes automáticamente y creará
+   el acceso directo "Sistema de Notificaciones" en tu Escritorio.
+
+3. Para abrir el programa en el día a día:
+   - Haz doble clic en el acceso directo "Sistema de Notificaciones"
+   - O haz doble clic en "Iniciar_App_Escritorio.bat".
+
+4. Cómo funciona:
+   - Pestaña Destinatarios: Agrega personas o grupos (manual o escaneando de WhatsApp).
+   - Asigna con casillas de verificación (Checklist) qué automatizaciones recibe cada uno.
+   - Pestaña Mensajes: Crea y edita N plantillas de notificación personalizadas.
+   - Pestaña Automatizaciones: Configura el día de envío (hábil o normal) y la hora.
+   - Haz clic en "Conectar WhatsApp" la primera vez para vincular el QR.
+============================================================

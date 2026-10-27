@@ -1,0 +1,41 @@
+{
+  "nombre_sistema": "Sistema de Notificaciones",
+  "notificaciones": [
+    {
+      "id": "notif_1",
+      "titulo": "Recordatorio General",
+      "cuerpo": "Hola {nombre}, te recordamos que tienes una notificación pendiente. Por favor confírmanos tu recepción. ¡Muchas gracias!",
+      "fecha_creacion": "2026-10-26"
+    },
+    {
+      "id": "notif_2",
+      "titulo": "Aviso de Pago / Vencimiento",
+      "cuerpo": "Estimado/a {nombre}: Le recordamos que hoy vence el plazo programado. Recuerde gestionarlo a tiempo.",
+      "fecha_creacion": "2026-10-26"
+    }
+  ],
+  "automatizaciones": [
+    {
+      "id": "auto_1",
+      "nombre": "Recordatorio Mensual (Día 4 Hábil)",
+      "mensaje_id": "notif_1",
+      "activo": true,
+      "hora": "09:00",
+      "dia_mes": 4,
+      "modalidad_dia": "habil",
+      "repetir_mensual": true,
+      "ultimo_envio_periodo": ""
+    },
+    {
+      "id": "auto_2",
+      "nombre": "Aviso de Pago (Día 20 Calendario)",
+      "mensaje_id": "notif_2",
+      "activo": false,
+      "hora": "12:00",
+      "dia_mes": 20,
+      "modalidad_dia": "calendario",
+      "repetir_mensual": true,
+      "ultimo_envio_periodo": ""
+    }
+  ]
+}
