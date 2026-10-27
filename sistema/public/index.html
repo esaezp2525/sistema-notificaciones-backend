@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=12">
+  <link rel="stylesheet" href="/style.css?v=13">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -249,10 +249,18 @@
                 <input type="text" id="filtro-plantillas" placeholder="Buscar en plantillas..." class="table-search">
               </div>
             </div>
+          <!-- BARRA DE VISTA MÓVIL (CATÁLOGO vs ASISTENTE IA) -->
+          <div class="mobile-subnav-toggle" id="plantillas-mobile-subnav">
+            <button type="button" class="subnav-toggle-btn active" id="btn-subnav-catalogo" data-subview="catalogo">
+              📋 Ver Catálogo (<span id="mobile-badge-plantillas">0</span>)
+            </button>
+            <button type="button" class="subnav-toggle-btn" id="btn-subnav-chat" data-subview="chat">
+              🤖 Asistente Redactor IA
+            </button>
           </div>
 
           <!-- CONTENEDOR DIVIDIDO: CATÁLOGO DE PLANTILLAS Y ASISTENTE IA -->
-          <div class="plantillas-split-container">
+          <div class="plantillas-split-container" id="plantillas-split-container">
             <!-- COLUMNA CATÁLOGO DE PLANTILLAS -->
             <div class="plantillas-catalog-col">
               <div class="cards-grid" id="grid-plantillas" style="padding: 14px;">
@@ -755,6 +763,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=12"></script>
+  <script src="/app.js?v=13"></script>
 </body>
 </html>

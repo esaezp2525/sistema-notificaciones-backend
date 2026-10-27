@@ -1742,27 +1742,36 @@ body {
    DISEÑO RESPONSIVO Y MOBILE-FIRST (SMARTPHONES Y TABLETS)
    ======================================================== */
 
+.mobile-subnav-toggle {
+  display: none;
+}
+
 @media (max-width: 860px) {
   /* Evitar zoom automático indeseado en iOS */
   input, select, textarea {
     font-size: 16px !important;
   }
 
-  /* Cabecera Principal */
+  /* Cabecera Principal Mobile-First */
   .app-header {
     flex-direction: column;
     align-items: stretch;
-    padding: 8px 12px;
+    padding: 10px 12px;
     gap: 8px;
+    background: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
   }
 
   .header-brand {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
     width: 100%;
   }
 
   .brand-title {
-    font-size: 14.5px;
+    font-size: 15px;
+    font-weight: 700;
   }
 
   .brand-subtitle {
@@ -1773,70 +1782,100 @@ body {
     width: 32px;
     height: 32px;
     font-size: 16px;
+    border-radius: 8px;
   }
 
   .header-right {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
     gap: 6px;
     width: 100%;
   }
 
   .empresa-selector-pill {
-    flex: 1 1 auto;
-    min-width: 130px;
-    padding: 3px 8px;
+    grid-column: 1 / 2;
+    padding: 4px 8px;
+    min-height: 40px;
+    justify-content: flex-start;
   }
 
   .select-empresa-dropdown {
     font-size: 12px;
+    font-weight: 600;
   }
 
   .wa-status-pill {
-    flex: 1 1 auto;
-    min-width: 140px;
-    padding: 3px 8px;
-    font-size: 11.5px;
-    justify-content: center;
+    grid-column: 2 / 3;
+    padding: 4px 8px;
+    min-height: 40px;
+    font-size: 11px;
+    justify-content: space-between;
   }
 
-  .btn-top-action {
-    flex: 1 1 auto;
-    padding: 7px 10px;
-    font-size: 11.5px;
-    justify-content: center;
-    min-height: 36px;
+  .wa-status-pill .status-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 80px;
+  }
+
+  .btn-wa-header {
+    padding: 4px 8px;
+    font-size: 11px;
+    font-weight: 700;
   }
 
   .btn-top-action.primary {
-    flex: 2 1 auto;
-    font-size: 12px;
+    grid-column: 1 / -1;
+    min-height: 42px;
+    font-size: 13px;
+    font-weight: 700;
+    justify-content: center;
+    border-radius: 8px;
+  }
+
+  .btn-top-action#btn-config-servidor {
+    grid-column: 1 / 2;
+    min-height: 36px;
+    font-size: 11.5px;
+    justify-content: center;
+  }
+
+  .btn-top-action.danger#btn-detener-envio {
+    grid-column: 2 / 3;
+    min-height: 36px;
+    font-size: 11.5px;
+    justify-content: center;
   }
 
   .user-session-pill {
-    padding: 3px 6px;
+    display: flex;
+    align-items: center;
     gap: 6px;
+    padding: 2px 6px;
   }
 
   .user-name-display {
     font-size: 11.5px;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .user-role-badge {
     display: none;
   }
 
-  /* Pestañas de Navegación */
+  /* Pestañas de Navegación Mobile-First */
   .app-nav-tabs {
-    padding: 0 8px;
-    gap: 4px;
+    padding: 4px 8px;
+    gap: 6px;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     background: #ffffff;
     border-bottom: 2px solid var(--border-color);
+    scroll-snap-type: x mandatory;
   }
 
   .app-nav-tabs::-webkit-scrollbar {
@@ -1844,26 +1883,36 @@ body {
   }
 
   .nav-tab {
-    padding: 10px 12px;
+    padding: 8px 12px;
     font-size: 12px;
+    font-weight: 600;
     white-space: nowrap;
     flex-shrink: 0;
-    min-height: 44px;
+    min-height: 42px;
     gap: 6px;
+    border-radius: 8px;
+    scroll-snap-align: start;
+  }
+
+  .nav-tab.active {
+    background: var(--primary-light, #eff6ff);
+    color: var(--primary, #2563eb);
+    border-bottom: 2px solid var(--primary, #2563eb);
   }
 
   .tab-icon {
-    font-size: 15px;
+    font-size: 16px;
   }
 
   .tab-badge {
-    font-size: 10.5px;
-    padding: 1px 6px;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 12px;
   }
 
-  /* Contenido Principal */
+  /* Contenido Principal Mobile */
   .app-main-content {
-    padding: 10px 8px;
+    padding: 8px;
     overflow-y: auto;
     flex-grow: 1;
     -webkit-overflow-scrolling: touch;
@@ -1873,7 +1922,8 @@ body {
     height: auto;
     min-height: 100%;
     overflow: visible;
-    border-radius: var(--radius-md);
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   }
 
   .tab-pane {
@@ -1898,18 +1948,20 @@ body {
   }
 
   #btn-nuevo-destinatario {
-    grid-column: span 2;
+    grid-column: 1 / -1;
     justify-content: center;
-    padding: 10px;
-    font-size: 13px;
-    min-height: 42px;
+    padding: 12px;
+    font-size: 13.5px;
+    font-weight: 700;
+    min-height: 44px;
+    border-radius: 8px;
   }
 
   #btn-abrir-modal-scan, #btn-reiniciar-estados {
     justify-content: center;
-    padding: 8px;
+    padding: 8px 6px;
     font-size: 11.5px;
-    min-height: 38px;
+    min-height: 40px;
   }
 
   .toolbar-right {
@@ -1922,21 +1974,24 @@ body {
 
   .table-search {
     width: 100%;
+    min-height: 40px;
+    font-size: 13px;
   }
 
   /* KPI Banner */
   .kpi-banner {
     grid-template-columns: repeat(2, 1fr);
     gap: 6px;
-    padding: 8px 10px;
+    padding: 8px;
   }
 
   .kpi-item:first-child {
-    grid-column: span 2;
+    grid-column: 1 / -1;
   }
 
   .kpi-item {
     padding: 8px 10px;
+    border-radius: 8px;
   }
 
   .kpi-num {
@@ -1944,28 +1999,31 @@ body {
   }
 
   .kpi-label {
-    font-size: 9.5px;
+    font-size: 10px;
   }
 
-  /* Tabla de Destinatarios */
+  /* Tabla de Destinatarios con Scroll Suave */
   .table-responsive {
     width: 100%;
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
   }
 
   .data-table {
     min-width: 620px;
-    font-size: 12px;
+    font-size: 12.5px;
   }
 
   .data-table th, .data-table td {
-    padding: 8px 10px;
+    padding: 10px 8px;
   }
 
   .data-table input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
   }
 
   .auto-checklist-chips {
@@ -1973,67 +2031,172 @@ body {
   }
 
   .auto-check-chip {
-    padding: 3px 8px;
+    padding: 4px 8px;
     font-size: 11px;
-    min-height: 28px;
+    min-height: 30px;
   }
 
   /* Grid de Tarjetas (Mensajes y Automatizaciones) */
   .cards-grid {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 12px;
     padding: 10px;
   }
 
   .notif-card, .auto-card {
-    padding: 12px;
+    padding: 14px;
+    border-radius: 12px;
   }
 
   .card-actions-line {
+    display: flex;
     flex-wrap: wrap;
     gap: 6px;
   }
 
   .btn-card-action {
-    padding: 6px 12px;
+    padding: 8px 12px;
     font-size: 12px;
+    min-height: 40px;
+    flex: 1 1 auto;
+    text-align: center;
+    justify-content: center;
+    border-radius: 6px;
+  }
+
+  /* ==================== MÓDULO DE PLANTILLAS MOBILE-FIRST ==================== */
+  .mobile-subnav-toggle {
+    display: flex;
+    gap: 6px;
+    padding: 8px 10px;
+    background: #f8fafc;
+    border-bottom: 1.5px solid var(--border-color);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  .subnav-toggle-btn {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: center;
+    border: 1.5px solid #cbd5e1;
+    background: #ffffff;
+    color: #475569;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .subnav-toggle-btn.active {
+    background: #2563eb;
+    color: #ffffff;
+    border-color: #2563eb;
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  }
+
+  .plantillas-split-container {
+    display: block;
+    height: auto;
+    overflow-y: visible;
+  }
+
+  /* Por defecto en móvil: mostrar Catálogo, ocultar Chat */
+  .plantillas-catalog-col {
+    display: block;
+    overflow-y: visible;
+  }
+
+  .asistente-chat-col {
+    display: none;
+    border-left: none;
+    border-radius: 12px;
+    min-height: 520px;
+    margin: 8px;
+  }
+
+  /* Cuando el usuario activa la pestaña Asistente IA en móvil */
+  .plantillas-split-container.show-chat .plantillas-catalog-col {
+    display: none;
+  }
+
+  .plantillas-split-container.show-chat .asistente-chat-col {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100dvh - 200px);
+  }
+
+  .filter-pills-bar {
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 6px;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+    scrollbar-width: none;
+  }
+
+  .filter-pills-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-pill {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    font-size: 12px;
+    min-height: 38px;
+  }
+
+  .asistente-quick-chips {
+    gap: 6px;
+    padding: 8px 10px;
+  }
+
+  .chip-prompt {
+    font-size: 11px;
+    padding: 6px 10px;
+    min-height: 34px;
+  }
+
+  .asistente-mode-bar {
+    padding: 6px 10px;
+    gap: 12px;
+  }
+
+  .mode-radio span {
+    font-size: 12px;
+  }
+
+  .btn-wa-action {
+    font-size: 11px;
+    padding: 6px 10px;
     min-height: 36px;
     flex: 1 1 auto;
     text-align: center;
     justify-content: center;
   }
 
-  /* Biblioteca de Plantillas y Asistente en Móviles */
-  .plantillas-split-container {
-    grid-template-columns: 1fr;
-    height: auto;
-    overflow-y: auto;
+  .asistente-input {
+    font-size: 14px;
   }
 
-  .asistente-chat-col {
-    border-left: none;
-    border-top: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    min-height: 480px;
-    margin-top: 10px;
-  }
-
-  .filter-pills-bar {
-    overflow-x: auto;
-    white-space: nowrap;
-    padding-bottom: 4px;
-    -webkit-overflow-scrolling: touch;
-    width: 100%;
-  }
-
-  .filter-pill {
-    flex-shrink: 0;
+  .btn-asistente-send {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
   }
 
   /* Consola de Transmisión */
   .console-card {
     height: auto;
     min-height: 380px;
+    border-radius: 12px;
   }
 
   .console-header {
@@ -2049,41 +2212,61 @@ body {
     max-height: 50vh;
   }
 
-  /* Modales en Móviles */
+  /* Modales Estilo Bottom-Sheet en Móviles */
   .modal-backdrop {
-    padding: 8px;
+    padding: 0;
     align-items: flex-end;
   }
 
   .modal-box {
     width: 100%;
     max-width: 100%;
-    max-height: calc(100dvh - 16px);
-    border-radius: 16px 16px 0 0;
+    max-height: 90dvh;
+    border-radius: 20px 20px 0 0;
     margin: 0;
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+    display: flex;
+    flex-direction: column;
+    animation: slideUpModal 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes slideUpModal {
+    from {
+      transform: translateY(100%);
+    }
+    to {
+      transform: translateY(0);
+    }
   }
 
   .modal-header {
-    padding: 12px 16px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-color);
   }
 
   .modal-body {
-    padding: 14px;
-    max-height: 65vh;
+    padding: 16px;
+    max-height: calc(90dvh - 130px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .modal-footer {
-    flex-direction: column-reverse;
+    flex-direction: column;
     gap: 8px;
-    padding: 12px 14px;
+    padding: 12px 16px;
+    background: #ffffff;
+    border-top: 1px solid var(--border-color);
   }
 
   .btn-dialog {
     width: 100%;
-    min-height: 44px;
+    min-height: 46px;
     text-align: center;
     justify-content: center;
-    font-size: 13.5px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: 10px;
   }
 
   .form-row-2 {
@@ -2100,24 +2283,26 @@ body {
 
   /* Toast en Móviles */
   .toast-hub {
-    left: 12px;
-    right: 12px;
-    bottom: 12px;
+    left: 14px;
+    right: 14px;
+    bottom: 14px;
     align-items: center;
   }
 
   .toast {
     max-width: 100%;
     width: 100%;
-    font-size: 12px;
-    padding: 10px 14px;
+    font-size: 12.5px;
+    padding: 12px 16px;
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   }
 }
 
-/* Pantallas muy pequeñas (Teléfonos menores a 480px) */
+/* Teléfonos Pequeños (menores a 480px) */
 @media (max-width: 480px) {
   .brand-title {
-    font-size: 13.5px;
+    font-size: 14px;
   }
 
   .user-info-text {
@@ -2129,8 +2314,8 @@ body {
   }
 
   .wa-status-pill {
-    min-width: 120px;
-    font-size: 11px;
+    min-width: 110px;
+    font-size: 10.5px;
   }
 
   .btn-top-action {
@@ -2139,8 +2324,9 @@ body {
   }
 
   .login-card {
-    padding: 22px 16px;
-    width: 95%;
+    padding: 24px 18px;
+    width: 92%;
+    border-radius: 16px;
   }
 
   .login-header h2 {

@@ -349,6 +349,23 @@ function setupEventListeners() {
     });
   });
 
+  // Alternar vista móvil (Catálogo vs Chat Asistente)
+  const btnSubnavCat = document.getElementById('btn-subnav-catalogo');
+  const btnSubnavChat = document.getElementById('btn-subnav-chat');
+  const splitContainer = document.getElementById('plantillas-split-container');
+
+  btnSubnavCat?.addEventListener('click', () => {
+    btnSubnavCat.classList.add('active');
+    btnSubnavChat?.classList.remove('active');
+    splitContainer?.classList.remove('show-chat');
+  });
+
+  btnSubnavChat?.addEventListener('click', () => {
+    btnSubnavChat.classList.add('active');
+    btnSubnavCat?.classList.remove('active');
+    splitContainer?.classList.add('show-chat');
+  });
+
   document.getElementById('btn-nueva-automatizacion')?.addEventListener('click', () => abrirModalAutomatizacion());
   document.getElementById('btn-cerrar-modal-auto')?.addEventListener('click', () => cerrarModal('modal-automatizacion'));
   document.getElementById('btn-cancelar-modal-auto')?.addEventListener('click', () => cerrarModal('modal-automatizacion'));
@@ -681,6 +698,8 @@ function actualizarUI() {
   document.getElementById('badge-total-autos').textContent = automatizacionesData.length;
   const badgePlantillas = document.getElementById('badge-total-plantillas');
   if (badgePlantillas) badgePlantillas.textContent = plantillasData.length;
+  const mobBadge = document.getElementById('mobile-badge-plantillas');
+  if (mobBadge) mobBadge.textContent = plantillasData.length;
 
   let pendientes = 0, enviados = 0, errores = 0, activos = 0;
   destinatariosData.forEach(d => {
