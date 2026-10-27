@@ -163,6 +163,8 @@ function initDefaultStorage() {
       { id: 101, nombre: 'Grupo Avisos Medcapital', tipo: 'Grupo', activo: true, automatizaciones: ['auto_med_1'], estado: 'Pendiente', fecha: '' }
     ];
     localStorage.setItem(`${STORAGE_KEY_DEST}_medcapital`, JSON.stringify(initialMedDest));
+  }
+
   // Plantillas por defecto
   if (!localStorage.getItem(`${STORAGE_KEY_PLANTILLAS}_contidep`)) {
     localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_contidep`, JSON.stringify(DEFAULT_PLANTILLAS_CHILENAS));
