@@ -354,18 +354,12 @@ function setupEventListeners() {
     }
   });
 
-  // Escanear WhatsApp en Vivo
-  document.getElementById('btn-probar-wa')?.addEventListener('click', abrirModalQR);
-  document.getElementById('btn-abrir-modal-scan')?.addEventListener('click', abrirModalQR);
-  document.getElementById('btn-cerrar-modal-qr')?.addEventListener('click', cerrarModalQR);
-  document.getElementById('btn-cancelar-modal-qr')?.addEventListener('click', cerrarModalQR);
-
-  // Desconectar sesión de la empresa activa
-  document.getElementById('btn-desconectar-wa-empresa')?.addEventListener('click', () => {
+  // Función unificada para desvincular WhatsApp de la empresa activa
+  window.desconectarWhatsAppEmpresa = function() {
     const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
     solicitarConfirmacion(
-      `¿Desconectar WhatsApp de ${cfg.nombre}?`,
-      `Esta acción cerrará la sesión de WhatsApp para ${cfg.nombre}. La otra empresa seguirá conectada independientemente.`,
+      `¿Desvincular WhatsApp de ${cfg.nombre}?`,
+      `Esta acción cerrará y borrará la sesión de WhatsApp para ${cfg.nombre}. Podrás vincular un número nuevo en cualquier momento.`,
       async () => {
         try {
           const res = await fetch(getApiEndpoint('/api/whatsapp/desconectar'), {
@@ -374,15 +368,31 @@ function setupEventListeners() {
             body: JSON.stringify({ empresa: currentEmpresa })
           });
           const data = await res.json();
-          showToast(data.message || 'Sesión desconectada', 'info');
+          showToast(data.message || `WhatsApp de ${cfg.nombre} desvinculado`, 'info');
           cerrarModalQR();
           verificarEstadoWhatsApp();
         } catch (err) {
-          showToast('Error al desconectar sesión', 'error');
+          showToast('Error al desvincular sesión', 'error');
         }
       }
     );
+  };
+
+  // Botón dinámico de WhatsApp en Cabecera (Conectar si está offline, Desvincular si está online)
+  document.getElementById('btn-probar-wa')?.addEventListener('click', () => {
+    const dot = document.getElementById('wa-status-dot');
+    if (dot && dot.classList.contains('online')) {
+      window.desconectarWhatsAppEmpresa();
+    } else {
+      abrirModalQR();
+    }
   });
+
+  document.getElementById('btn-abrir-modal-scan')?.addEventListener('click', abrirModalQR);
+  document.getElementById('btn-cerrar-modal-qr')?.addEventListener('click', cerrarModalQR);
+  document.getElementById('btn-cancelar-modal-qr')?.addEventListener('click', cerrarModalQR);
+  document.getElementById('btn-desconectar-wa-empresa')?.addEventListener('click', window.desconectarWhatsAppEmpresa);
+  document.getElementById('btn-desconectar-wa-empresa-modal')?.addEventListener('click', window.desconectarWhatsAppEmpresa);
 
   // Limpiar consola
   document.getElementById('btn-limpiar-consola')?.addEventListener('click', () => {
@@ -404,6 +414,7 @@ function getApiEndpoint(path) {
 async function verificarEstadoWhatsApp() {
   const dot = document.getElementById('wa-status-dot');
   const text = document.getElementById('wa-status-text');
+  const btnWA = document.getElementById('btn-probar-wa');
   const btnDisconnect = document.getElementById('btn-desconectar-wa-empresa');
   const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
   try {
@@ -412,15 +423,29 @@ async function verificarEstadoWhatsApp() {
     if (data.authenticated) {
       if (dot) dot.className = 'status-dot online';
       if (text) text.textContent = `WA ${cfg.nombre}: Conectado`;
+      if (btnWA) {
+        btnWA.textContent = '🔌 Desvincular';
+        btnWA.style.color = '#ef4444';
+        btnWA.title = `Desvincular WhatsApp de ${cfg.nombre}`;
+      }
       if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
     } else {
       if (dot) dot.className = 'status-dot offline';
       if (text) text.textContent = `WA ${cfg.nombre}: Desconectado`;
+      if (btnWA) {
+        btnWA.textContent = '📲 Conectar';
+        btnWA.style.color = '';
+        btnWA.title = `Vincular WhatsApp de ${cfg.nombre}`;
+      }
       if (btnDisconnect) btnDisconnect.style.display = 'none';
     }
   } catch (e) {
     if (dot) dot.className = 'status-dot offline';
     if (text) text.textContent = `WA ${cfg.nombre}: Sin Motor`;
+    if (btnWA) {
+      btnWA.textContent = '📲 Conectar';
+      btnWA.style.color = '';
+    }
     if (btnDisconnect) btnDisconnect.style.display = 'none';
   }
 }
@@ -432,11 +457,24 @@ function abrirModalQR() {
   const successState = document.getElementById('qr-success-state');
   const qrImg = document.getElementById('qr-image-display');
   const statusText = document.getElementById('qr-status-text');
+  const btnDisconnect = document.getElementById('btn-desconectar-wa-empresa');
   const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
+
+  // Si ya está autenticado, mostrar estado conectado con opción de desvincular
+  const isOnline = document.getElementById('wa-status-dot')?.classList.contains('online');
+  if (isOnline) {
+    if (loadingState) loadingState.style.display = 'none';
+    if (displayContainer) displayContainer.style.display = 'none';
+    if (successState) successState.style.display = 'block';
+    if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
+    abrirModal('modal-qr-whatsapp');
+    return;
+  }
 
   if (loadingState) loadingState.style.display = 'block';
   if (displayContainer) displayContainer.style.display = 'none';
   if (successState) successState.style.display = 'none';
+  if (btnDisconnect) btnDisconnect.style.display = 'none';
   if (statusText) statusText.textContent = `Iniciando conexión con WhatsApp para ${cfg.nombre}...`;
 
   abrirModal('modal-qr-whatsapp');
@@ -457,11 +495,11 @@ function abrirModalQR() {
         if (loadingState) loadingState.style.display = 'none';
         if (displayContainer) displayContainer.style.display = 'none';
         if (successState) successState.style.display = 'block';
+        if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
         clearInterval(qrPollInterval);
         qrPollInterval = null;
         verificarEstadoWhatsApp();
         showToast(`¡WhatsApp de ${cfg.nombre} vinculado exitosamente!`, 'success');
-        setTimeout(() => cerrarModal('modal-qr-whatsapp'), 3000);
         return;
       } else if (data.status_text && statusText) {
         statusText.textContent = data.status_text;

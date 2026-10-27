@@ -154,27 +154,33 @@ def forzar_cierre_playwright():
         pass
 
 def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None):
-    """Abre el navegador persistente para WhatsApp Web evitando bloqueos de perfil."""
+    """Abre el navegador persistente para WhatsApp Web evitando bloqueos de perfil y de automatización."""
     if headless is None:
         headless = IS_HEADLESS
     sess_dir = get_session_dir(empresa_id)
     ultimo_error = None
     for intento in range(3):
         try:
-            return p.chromium.launch_persistent_context(
+            ctx = p.chromium.launch_persistent_context(
                 user_data_dir=sess_dir,
                 headless=headless,
+                ignore_default_args=["--enable-automation"],
                 args=[
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
+                    "--disable-gpu",
+                    "--disable-extensions",
+                    "--no-first-run",
                     "--window-size=1280,800"
                 ],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 viewport={"width": 1280, "height": 800}
             )
+            ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+            return ctx
         except Exception as e:
             ultimo_error = e
             add_log("warning", f"[{empresa_id.title()}] Intento {intento+1}: Carpeta bloqueada. Liberando procesos...")
@@ -949,7 +955,7 @@ def qr_worker(empresa_id="contidep"):
 
             while time.time() - start_time < 180:
                 try:
-                    chat_list = page.query_selector("#pane-side, [data-testid='chat-list']")
+                    chat_list = page.query_selector("#pane-side, [data-testid='chat-list'], header[data-testid='chatlist-header']")
                     if chat_list:
                         with qr_lock:
                             qr_state[safe_empresa]["authenticated"] = True
@@ -958,12 +964,33 @@ def qr_worker(empresa_id="contidep"):
                             qr_state[safe_empresa]["is_active"] = False
                         whatsapp_autenticado[safe_empresa] = True
                         add_log("success", f"✅ WhatsApp Web [{safe_empresa.title()}] autenticado exitosamente.")
+                        # Pausa breve para garantizar que IndexedDB guarde tokens de sesión en disco
+                        time.sleep(3.5)
                         break
                 except Exception:
                     pass
 
+                # Detectar si el usuario ya escaneó el QR en su celular y WhatsApp está cargando chats
                 try:
-                    qr_el = page.query_selector("canvas[aria-label*='QR'], div[data-ref], [data-testid='qrcode']")
+                    loading_chats = page.query_selector("progress, [role='progressbar'], [data-testid='intro-title'], div:has-text('Cargando tus chats')")
+                    if loading_chats and not qr_state[safe_empresa]["authenticated"]:
+                        with qr_lock:
+                            qr_state[safe_empresa]["status_text"] = f"¡QR escaneado! Sincronizando chats de {safe_empresa.title()}..."
+                            qr_state[safe_empresa]["qr_base64"] = None
+                except Exception:
+                    pass
+
+                # Detectar si WhatsApp muestra botón de recargar QR por inactividad
+                try:
+                    reload_btn = page.query_selector("button:has-text('recargar'), [data-testid='refresh-qr'], div[role='button']:has(span[data-icon='reload'])")
+                    if reload_btn:
+                        reload_btn.click()
+                        time.sleep(1)
+                except Exception:
+                    pass
+
+                try:
+                    qr_el = page.query_selector("canvas[aria-label*='QR'], canvas, div[data-ref], [data-testid='qrcode']")
                     if qr_el:
                         qr_bytes = qr_el.screenshot()
                         b64_img = f"data:image/png;base64,{base64.b64encode(qr_bytes).decode('utf-8')}"
@@ -1039,7 +1066,13 @@ def api_whatsapp_desconectar():
     data = request.get_json(silent=True) or {}
     empresa = request.args.get("empresa") or data.get("empresa", "contidep")
     safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
-    whatsapp_autenticado[safe_empresa] = False
+    with qr_lock:
+        whatsapp_autenticado[safe_empresa] = False
+        qr_state[safe_empresa]["authenticated"] = False
+        qr_state[safe_empresa]["qr_base64"] = None
+        qr_state[safe_empresa]["is_active"] = False
+        qr_state[safe_empresa]["status_text"] = f"Sesión de {safe_empresa.title()} desconectada."
+        qr_state[safe_empresa]["error"] = None
     try:
         forzar_cierre_playwright()
         import shutil
@@ -1047,7 +1080,7 @@ def api_whatsapp_desconectar():
         if os.path.exists(sdir):
             shutil.rmtree(sdir, ignore_errors=True)
         add_log("info", f"[{safe_empresa.title()}] Sesión de WhatsApp cerrada y limpiada.")
-        return jsonify({"success": True, "message": f"Sesión de {safe_empresa.title()} desconectada"})
+        return jsonify({"success": True, "message": f"Sesión de {safe_empresa.title()} desvinculada exitosamente."})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 

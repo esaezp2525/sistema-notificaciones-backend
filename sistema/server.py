@@ -24,7 +24,14 @@ IS_HEADLESS = os.environ.get("HEADLESS", "false").lower() in ("true", "1", "yes"
 PORT = int(os.environ.get("PORT", 5829))
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-SESSION_DIR = os.path.join(BASE_DIR, "whatsapp_session")
+SESSION_BASE_DIR = os.path.join(BASE_DIR, "whatsapp_session")
+
+def get_session_dir(empresa_id="contidep"):
+    safe_id = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
+    path = os.path.join(SESSION_BASE_DIR, safe_id)
+    os.makedirs(path, exist_ok=True)
+    return path
+
 CONFIG_FILE = os.path.join(BASE_DIR, "config_sistema.json")
 EXCEL_FILE = os.path.join(BASE_DIR, "destinatarios.xlsx")
 
@@ -41,11 +48,15 @@ automation_state = {
     "fallidos": 0,
     "stop_requested": False,
     "tarea_actual": "",
+    "empresa_actual": "contidep"
 }
 
 terminal_logs = []
 logs_lock = threading.Lock()
-whatsapp_autenticado = None
+whatsapp_autenticado = {
+    "contidep": False,
+    "medcapital": False
+}
 
 def add_log(level, msg):
     with logs_lock:
@@ -137,54 +148,64 @@ def forzar_cierre_playwright():
                  "Get-Process chrome,msedge,chromium -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*whatsapp_session*' } | Stop-Process -Force"],
                 capture_output=True, timeout=8
             )
+        else:
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
     except Exception:
         pass
 
-def abrir_contexto_whatsapp(p, headless=None):
-    """Abre el navegador persistente para WhatsApp Web evitando bloqueos de perfil."""
+def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None):
+    """Abre el navegador persistente para WhatsApp Web evitando bloqueos de perfil y de automatización."""
     if headless is None:
         headless = IS_HEADLESS
-    os.makedirs(SESSION_DIR, exist_ok=True)
+    sess_dir = get_session_dir(empresa_id)
     ultimo_error = None
     for intento in range(3):
         try:
-            return p.chromium.launch_persistent_context(
-                user_data_dir=SESSION_DIR,
+            ctx = p.chromium.launch_persistent_context(
+                user_data_dir=sess_dir,
                 headless=headless,
+                ignore_default_args=["--enable-automation"],
                 args=[
                     "--no-sandbox",
                     "--disable-setuid-sandbox",
                     "--disable-dev-shm-usage",
                     "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
+                    "--disable-gpu",
+                    "--disable-extensions",
+                    "--no-first-run",
                     "--window-size=1280,800"
                 ],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 viewport={"width": 1280, "height": 800}
             )
+            ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
+            return ctx
         except Exception as e:
             ultimo_error = e
-            add_log("warning", f"Intento {intento+1}: Carpeta bloqueada. Liberando procesos...")
+            add_log("warning", f"[{empresa_id.title()}] Intento {intento+1}: Carpeta bloqueada. Liberando procesos...")
             forzar_cierre_playwright()
             time.sleep(1.5)
     raise ultimo_error
 
 # ==================== TRABAJADOR DE ENVÍOS (WORKER) ====================
-def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío"):
+def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío", empresa_id="contidep"):
     global whatsapp_autenticado
+    safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     automation_state["is_running"] = True
     automation_state["stop_requested"] = False
     automation_state["procesados"] = 0
     automation_state["enviados"] = 0
     automation_state["fallidos"] = 0
-    automation_state["tarea_actual"] = nombre_tarea
+    automation_state["tarea_actual"] = f"[{safe_empresa.title()}] {nombre_tarea}"
+    automation_state["empresa_actual"] = safe_empresa
 
-    add_log("info", f"Iniciando proceso: '{nombre_tarea}'...")
+    add_log("info", f"[{safe_empresa.title()}] Iniciando proceso: '{nombre_tarea}'...")
 
     try:
-        destinatarios_db = database.db_obtener_destinatarios()
-        notificaciones = database.db_obtener_notificaciones()
-        automatizaciones = database.db_obtener_automatizaciones()
+        destinatarios_db = database.db_obtener_destinatarios(empresa_id=safe_empresa)
+        notificaciones = database.db_obtener_notificaciones(empresa_id=safe_empresa)
+        automatizaciones = database.db_obtener_automatizaciones(empresa_id=safe_empresa)
 
         # 1. Determinar plantilla de mensaje
         plantilla_cuerpo = "Hola {nombre}, este es un aviso importante."
@@ -225,36 +246,37 @@ def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío"):
         automation_state["total"] = total
 
         if total == 0:
-            add_log("info", "No hay destinatarios pendientes para esta tarea.")
+            add_log("info", f"[{safe_empresa.title()}] No hay destinatarios pendientes para esta tarea.")
             automation_state["is_running"] = False
             return
 
-        session_activa = os.path.exists(SESSION_DIR) and len(os.listdir(SESSION_DIR)) > 0
+        sess_dir = get_session_dir(safe_empresa)
+        session_activa = os.path.exists(sess_dir) and len(os.listdir(sess_dir)) > 0
         if not session_activa:
-            add_log("error", "No has vinculado tu WhatsApp. Haz clic en 'Conectar' para escanear el QR.")
+            add_log("error", f"[{safe_empresa.title()}] No has vinculado tu WhatsApp. Haz clic en 'Conectar' para escanear el QR.")
             automation_state["is_running"] = False
             return
 
-        add_log("info", f"Enviando a {total} destinatario(s)...")
+        add_log("info", f"[{safe_empresa.title()}] Enviando a {total} destinatario(s)...")
         with sync_playwright() as p:
-            context = abrir_contexto_whatsapp(p, headless=True)
+            context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True)
             page = context.pages[0] if context.pages else context.new_page()
             page.goto("https://web.whatsapp.com")
 
             try:
                 page.wait_for_selector("#pane-side, [data-testid='chat-list']", timeout=35000)
-                whatsapp_autenticado = True
-                add_log("success", "Sesión de WhatsApp verificada. Procesando cola de envíos...")
+                whatsapp_autenticado[safe_empresa] = True
+                add_log("success", f"[{safe_empresa.title()}] Sesión de WhatsApp verificada. Procesando cola de envíos...")
             except Exception:
                 qr_el = page.query_selector("canvas[aria-label*='QR'], div[data-ref], [data-testid='qrcode']")
                 context.close()
                 forzar_cierre_playwright()
                 automation_state["is_running"] = False
                 if qr_el:
-                    whatsapp_autenticado = False
-                    add_log("error", "La sesión de WhatsApp expiró o requiere escanear el QR.")
+                    whatsapp_autenticado[safe_empresa] = False
+                    add_log("error", f"[{safe_empresa.title()}] La sesión de WhatsApp expiró o requiere escanear el QR.")
                 else:
-                    add_log("error", "Tiempo agotado esperando conexión a WhatsApp Web.")
+                    add_log("error", f"[{safe_empresa.title()}] Tiempo agotado esperando conexión a WhatsApp Web.")
                 return
 
             time.sleep(2)
@@ -428,14 +450,16 @@ def background_scheduler():
                     if current_day == dia_efectivo.day and current_hm == target_hm and last_run != current_period:
                         if not automation_state["is_running"]:
                             auto_nombre = auto.get("nombre", f"Auto #{auto['id']}")
-                            add_log("info", f"⏰ [PROGRAMADOR] Activada tarea '{auto_nombre}'. Iniciando envíos...")
+                            empresa_id = auto.get("empresa_id", "contidep")
+                            add_log("info", f"⏰ [PROGRAMADOR] Activada tarea '{auto_nombre}' para {empresa_id.title()}. Iniciando envíos...")
                             database.db_actualizar_periodo_auto(auto["id"], current_period)
 
                             t = threading.Thread(
                                 target=automation_worker,
                                 kwargs={
                                     "auto_id": auto["id"],
-                                    "nombre_tarea": f"Automática ({auto_nombre})"
+                                    "nombre_tarea": f"Automática ({auto_nombre})",
+                                    "empresa_id": empresa_id
                                 },
                                 daemon=True
                             )
@@ -573,9 +597,14 @@ def cambiar_clave_admin():
 @app.route("/api/data", methods=["GET"])
 def get_data():
     try:
-        destinatarios = database.db_obtener_destinatarios()
-        notificaciones = database.db_obtener_notificaciones()
-        automatizaciones = database.db_obtener_automatizaciones()
+        empresa = request.args.get("empresa", "contidep").strip().lower()
+        if empresa not in ("contidep", "medcapital"):
+            empresa = "contidep"
+
+        destinatarios = database.db_obtener_destinatarios(empresa_id=empresa)
+        notificaciones = database.db_obtener_notificaciones(empresa_id=empresa)
+        automatizaciones = database.db_obtener_automatizaciones(empresa_id=empresa)
+        empresas = database.db_obtener_empresas()
 
         totales = {"total": len(destinatarios), "pendientes": 0, "enviados": 0, "errores": 0, "activos": 0}
 
@@ -594,16 +623,20 @@ def get_data():
         for a in automatizaciones:
             a["proximo_texto"] = calcular_proximo_envio(a)
 
-        session_activa = os.path.exists(SESSION_DIR) and len(os.listdir(SESSION_DIR)) > 0 and (whatsapp_autenticado is not False)
+        sess_dir = get_session_dir(empresa)
+        session_activa = os.path.exists(sess_dir) and len(os.listdir(sess_dir)) > 0 and (whatsapp_autenticado.get(empresa) is not False)
 
         return jsonify({
             "success": True,
             "sistema_nombre": "Sistema de Notificaciones",
+            "empresa_actual": empresa,
+            "empresas": empresas,
             "notificaciones": notificaciones,
             "automatizaciones": automatizaciones,
             "destinatarios": destinatarios,
             "totales": totales,
             "session_activa": session_activa,
+            "whatsapp_autenticado": bool(whatsapp_autenticado.get(empresa, False)),
             "is_running": automation_state["is_running"]
         })
     except Exception as e:
@@ -621,7 +654,8 @@ def get_logs():
         "total": automation_state["total"],
         "enviados": automation_state["enviados"],
         "fallidos": automation_state["fallidos"],
-        "tarea_actual": automation_state.get("tarea_actual", "")
+        "tarea_actual": automation_state.get("tarea_actual", ""),
+        "empresa_actual": automation_state.get("empresa_actual", "contidep")
     })
 
 @app.route("/api/logs/limpiar", methods=["POST"])
@@ -638,12 +672,13 @@ def guardar_notificacion():
         nid = data.get("id")
         titulo = data.get("titulo", "").strip()
         cuerpo = data.get("cuerpo", "").strip()
+        empresa_id = str(data.get("empresa_id") or data.get("empresa") or "contidep").strip().lower()
 
         if not titulo:
             return jsonify({"success": False, "error": "El título del mensaje es requerido"}), 400
 
-        guardado_id = database.db_guardar_notificacion(nid, titulo, cuerpo)
-        add_log("info", f"Plantilla guardada: '{titulo}' ({guardado_id}).")
+        guardado_id = database.db_guardar_notificacion(nid, titulo, cuerpo, empresa_id=empresa_id)
+        add_log("info", f"[{empresa_id.title()}] Plantilla guardada: '{titulo}' ({guardado_id}).")
         return jsonify({"success": True, "id": guardado_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -672,14 +707,15 @@ def guardar_automatizacion():
         hora = str(data.get("hora", "09:00")).strip()
         activo = bool(data.get("activo", True))
         repetir = bool(data.get("repetir_mensual", True))
+        empresa_id = str(data.get("empresa_id") or data.get("empresa") or "contidep").strip().lower()
 
         if not nombre:
             return jsonify({"success": False, "error": "El nombre de la automatización es requerido"}), 400
         if not mensaje_id:
             return jsonify({"success": False, "error": "Debes asociar un mensaje a la automatización"}), 400
 
-        guardado_id = database.db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad, hora, activo, repetir)
-        add_log("info", f"Automatización guardada: '{nombre}' ({guardado_id}).")
+        guardado_id = database.db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad, hora, activo, repetir, empresa_id=empresa_id)
+        add_log("info", f"[{empresa_id.title()}] Automatización guardada: '{nombre}' ({guardado_id}).")
         return jsonify({"success": True, "id": guardado_id})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -704,16 +740,17 @@ def guardar_destinatario():
         nombre = str(data.get("nombre", "")).strip()
         tipo = str(data.get("tipo", "Grupo")).strip()
         activo = bool(data.get("activo", True))
+        empresa_id = str(data.get("empresa_id") or data.get("empresa") or "contidep").strip().lower()
 
         if not nombre:
             return jsonify({"success": False, "error": "El nombre del destinatario es requerido"}), 400
 
         if dest_id is not None and dest_id != "":
-            database.db_actualizar_destinatario(int(dest_id), nombre, tipo, activo)
-            add_log("info", f"Destinatario actualizado: '{nombre}'")
+            database.db_actualizar_destinatario(int(dest_id), nombre, tipo, activo, empresa_id=empresa_id)
+            add_log("info", f"[{empresa_id.title()}] Destinatario actualizado: '{nombre}'")
         else:
-            database.db_guardar_destinatario(nombre, tipo, activo)
-            add_log("info", f"Nuevo destinatario agregado: '{nombre}'")
+            database.db_guardar_destinatario(nombre, tipo, activo, empresa_id=empresa_id)
+            add_log("info", f"[{empresa_id.title()}] Nuevo destinatario agregado: '{nombre}'")
 
         database.db_sincronizar_a_excel()
         return jsonify({"success": True})
@@ -750,12 +787,17 @@ def toggle_auto_destinatario():
 @app.route("/api/destinatarios/reiniciar-estados", methods=["POST"])
 def reiniciar_estados():
     try:
+        data = request.get_json(silent=True) or {}
+        empresa_id = request.args.get("empresa") or data.get("empresa_id") or data.get("empresa")
         conn = database.get_db_connection()
-        conn.execute("UPDATE destinatarios SET estado_envio = 'Pendiente', fecha_envio = ''")
+        if empresa_id:
+            conn.execute("UPDATE destinatarios SET estado_envio = 'Pendiente', fecha_envio = '' WHERE empresa_id = ?", (empresa_id.strip().lower(),))
+        else:
+            conn.execute("UPDATE destinatarios SET estado_envio = 'Pendiente', fecha_envio = ''")
         conn.commit()
         conn.close()
         database.db_sincronizar_a_excel()
-        add_log("info", "Estados de envío reiniciados a 'Pendiente'.")
+        add_log("info", f"Estados de envío reiniciados a 'Pendiente' ({empresa_id or 'todas'}).")
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -763,12 +805,17 @@ def reiniciar_estados():
 @app.route("/api/destinatarios/limpiar", methods=["POST"])
 def limpiar_destinatarios():
     try:
+        data = request.get_json(silent=True) or {}
+        empresa_id = request.args.get("empresa") or data.get("empresa_id") or data.get("empresa")
         conn = database.get_db_connection()
-        conn.execute("DELETE FROM destinatarios")
+        if empresa_id:
+            conn.execute("DELETE FROM destinatarios WHERE empresa_id = ?", (empresa_id.strip().lower(),))
+        else:
+            conn.execute("DELETE FROM destinatarios")
         conn.commit()
         conn.close()
         database.db_sincronizar_a_excel()
-        add_log("warning", "Lista de destinatarios vaciada.")
+        add_log("warning", f"Lista de destinatarios vaciada ({empresa_id or 'todas'}).")
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
@@ -783,14 +830,15 @@ def iniciar_envio_manual():
     auto_id = data.get("auto_id")
     dest_ids = data.get("dest_ids")
     nombre_tarea = data.get("nombre_tarea", "Envío Manual Inmediato")
+    empresa_id = str(data.get("empresa_id") or data.get("empresa") or "contidep").strip().lower()
 
     t = threading.Thread(
         target=automation_worker,
-        kwargs={"auto_id": auto_id, "dest_ids": dest_ids, "nombre_tarea": nombre_tarea},
+        kwargs={"auto_id": auto_id, "dest_ids": dest_ids, "nombre_tarea": nombre_tarea, "empresa_id": empresa_id},
         daemon=True
     )
     t.start()
-    return jsonify({"success": True, "message": "Proceso de envío iniciado"})
+    return jsonify({"success": True, "message": f"Proceso de envío iniciado para {empresa_id.title()}"})
 
 @app.route("/api/enviar/detener", methods=["POST"])
 def detener_envio():
@@ -806,27 +854,31 @@ def escanear_whatsapp():
     if automation_state["is_running"]:
         return jsonify({"success": False, "error": "Hay un envío en curso"}), 400
 
+    data = request.get_json(silent=True) or {}
+    empresa = request.args.get("empresa") or data.get("empresa", "contidep")
+    safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
+
     def scan_thread():
         global whatsapp_autenticado
         automation_state["is_running"] = True
-        add_log("info", "Abriendo WhatsApp Web para escanear contactos y grupos...")
+        add_log("info", f"[{safe_empresa.title()}] Abriendo WhatsApp Web para escanear contactos y grupos...")
         try:
             with sync_playwright() as p:
-                context = abrir_contexto_whatsapp(p, headless=False)
+                context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=False)
                 page = context.pages[0] if context.pages else context.new_page()
                 page.goto("https://web.whatsapp.com")
 
                 try:
                     page.wait_for_selector("#pane-side, [data-testid='chat-list']", timeout=40000)
-                    whatsapp_autenticado = True
-                    add_log("success", "WhatsApp autenticado. Extrayendo chats...")
+                    whatsapp_autenticado[safe_empresa] = True
+                    add_log("success", f"[{safe_empresa.title()}] WhatsApp autenticado. Extrayendo chats...")
                 except Exception:
                     qr_el = page.query_selector("canvas[aria-label*='QR'], div[data-ref], [data-testid='qrcode']")
                     if qr_el:
-                        add_log("warning", "Escanea el código QR que se abrió en tu pantalla...")
+                        add_log("warning", f"[{safe_empresa.title()}] Escanea el código QR que se abrió en tu pantalla...")
                         page.wait_for_selector("#pane-side, [data-testid='chat-list']", timeout=60000)
-                        whatsapp_autenticado = True
-                        add_log("success", "¡QR escaneado con éxito!")
+                        whatsapp_autenticado[safe_empresa] = True
+                        add_log("success", f"[{safe_empresa.title()}] ¡QR escaneado con éxito!")
                     else:
                         raise Exception("Tiempo agotado esperando WhatsApp Web.")
 
@@ -840,80 +892,112 @@ def escanear_whatsapp():
                         detectados.append(t.strip())
 
                 # Importar a destinatarios si no existen
-                existentes = [d["nombre"].lower() for d in database.db_obtener_destinatarios()]
+                existentes = [d["nombre"].lower() for d in database.db_obtener_destinatarios(empresa_id=safe_empresa)]
                 nuevos_agregados = 0
                 for d in detectados:
                     if d.lower() not in existentes:
                         tipo = "Grupo" if any(pal in d.lower() for pal in ["grupo", "equipo", "comunidad", "taller", "familia", "aviso"]) else "Contacto"
-                        database.db_guardar_destinatario(d, tipo, activo=True)
+                        database.db_guardar_destinatario(d, tipo, activo=True, empresa_id=safe_empresa)
                         existentes.append(d.lower())
                         nuevos_agregados += 1
 
                 database.db_sincronizar_a_excel()
-                add_log("success", f"Escaneo finalizado. Detectados {len(detectados)} chats ({nuevos_agregados} nuevos añadidos).")
+                add_log("success", f"[{safe_empresa.title()}] Escaneo finalizado. Detectados {len(detectados)} chats ({nuevos_agregados} nuevos añadidos).")
                 context.close()
                 forzar_cierre_playwright()
         except Exception as e:
-            add_log("error", f"Error en escaneo de WhatsApp: {e}")
+            add_log("error", f"[{safe_empresa.title()}] Error en escaneo de WhatsApp: {e}")
         finally:
             automation_state["is_running"] = False
 
     t = threading.Thread(target=scan_thread, daemon=True)
     t.start()
-    return jsonify({"success": True, "message": "Escaneo iniciado"})
+    return jsonify({"success": True, "message": f"Escaneo iniciado para {safe_empresa.title()}"})
 
-# ==================== TRANSMISIÓN DE CÓDIGO QR EN VIVO ====================
+# ==================== TRANSMISIÓN DE CÓDIGO QR EN VIVO (MULTI-EMPRESA) ====================
 qr_state = {
-    "is_active": False,
-    "authenticated": False,
-    "qr_base64": None,
-    "last_check": 0,
-    "status_text": "Iniciando conexión con WhatsApp...",
-    "error": None
+    "contidep": {
+        "is_active": False,
+        "authenticated": False,
+        "qr_base64": None,
+        "last_check": 0,
+        "status_text": "Iniciando conexión con WhatsApp...",
+        "error": None
+    },
+    "medcapital": {
+        "is_active": False,
+        "authenticated": False,
+        "qr_base64": None,
+        "last_check": 0,
+        "status_text": "Iniciando conexión con WhatsApp...",
+        "error": None
+    }
 }
 qr_lock = threading.Lock()
 
-def qr_worker():
+def qr_worker(empresa_id="contidep"):
+    safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     global whatsapp_autenticado
     with qr_lock:
-        qr_state["is_active"] = True
-        qr_state["qr_base64"] = None
-        qr_state["status_text"] = "Iniciando navegador seguro..."
-        qr_state["error"] = None
+        qr_state[safe_empresa]["is_active"] = True
+        qr_state[safe_empresa]["qr_base64"] = None
+        qr_state[safe_empresa]["status_text"] = f"Iniciando navegador seguro ({safe_empresa.title()})..."
+        qr_state[safe_empresa]["error"] = None
 
     try:
         with sync_playwright() as p:
-            context = abrir_contexto_whatsapp(p, headless=True)
+            context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True)
             page = context.pages[0] if context.pages else context.new_page()
             page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=50000)
 
-            add_log("info", "Buscando sesión existente o código QR de WhatsApp...")
+            add_log("info", f"[{safe_empresa.title()}] Buscando sesión existente o código QR de WhatsApp...")
             start_time = time.time()
 
             while time.time() - start_time < 180:
                 try:
-                    chat_list = page.query_selector("#pane-side, [data-testid='chat-list']")
+                    chat_list = page.query_selector("#pane-side, [data-testid='chat-list'], header[data-testid='chatlist-header']")
                     if chat_list:
                         with qr_lock:
-                            qr_state["authenticated"] = True
-                            qr_state["status_text"] = "¡WhatsApp Conectado con Éxito!"
-                            qr_state["qr_base64"] = None
-                            qr_state["is_active"] = False
-                        whatsapp_autenticado = True
-                        add_log("success", "✅ WhatsApp Web autenticado exitosamente.")
+                            qr_state[safe_empresa]["authenticated"] = True
+                            qr_state[safe_empresa]["status_text"] = f"¡WhatsApp {safe_empresa.title()} Conectado con Éxito!"
+                            qr_state[safe_empresa]["qr_base64"] = None
+                            qr_state[safe_empresa]["is_active"] = False
+                        whatsapp_autenticado[safe_empresa] = True
+                        add_log("success", f"✅ WhatsApp Web [{safe_empresa.title()}] autenticado exitosamente.")
+                        # Pausa breve para garantizar que IndexedDB guarde tokens de sesión en disco
+                        time.sleep(3.5)
                         break
                 except Exception:
                     pass
 
+                # Detectar si el usuario ya escaneó el QR en su celular y WhatsApp está cargando chats
                 try:
-                    qr_el = page.query_selector("canvas[aria-label*='QR'], div[data-ref], [data-testid='qrcode']")
+                    loading_chats = page.query_selector("progress, [role='progressbar'], [data-testid='intro-title'], div:has-text('Cargando tus chats')")
+                    if loading_chats and not qr_state[safe_empresa]["authenticated"]:
+                        with qr_lock:
+                            qr_state[safe_empresa]["status_text"] = f"¡QR escaneado! Sincronizando chats de {safe_empresa.title()}..."
+                            qr_state[safe_empresa]["qr_base64"] = None
+                except Exception:
+                    pass
+
+                # Detectar si WhatsApp muestra botón de recargar QR por inactividad
+                try:
+                    reload_btn = page.query_selector("button:has-text('recargar'), [data-testid='refresh-qr'], div[role='button']:has(span[data-icon='reload'])")
+                    if reload_btn:
+                        reload_btn.click()
+                        time.sleep(1)
+                except Exception:
+                    pass
+
+                try:
+                    qr_el = page.query_selector("canvas[aria-label*='QR'], canvas, div[data-ref], [data-testid='qrcode']")
                     if qr_el:
                         qr_bytes = qr_el.screenshot()
                         b64_img = f"data:image/png;base64,{base64.b64encode(qr_bytes).decode('utf-8')}"
                         with qr_lock:
-                            qr_state["qr_base64"] = b64_img
-                            qr_state["status_text"] = "Escanea el código QR con tu WhatsApp"
-                            qr_state["last_check"] = time.time()
+                            qr_state[safe_empresa]["qr_base64"] = b64_img
+                            qr_state[safe_empresa]["status_text"] = f"Escanea el código QR con el WhatsApp de {safe_empresa.title()}"
+                            qr_state[safe_empresa]["last_check"] = time.time()
                 except Exception:
                     pass
 
@@ -926,56 +1010,77 @@ def qr_worker():
             forzar_cierre_playwright()
     except Exception as e:
         with qr_lock:
-            qr_state["error"] = str(e)
-            qr_state["status_text"] = f"Error: {e}"
-        add_log("error", f"Error en generador de QR: {e}")
+            qr_state[safe_empresa]["error"] = str(e)
+            qr_state[safe_empresa]["status_text"] = f"Error: {e}"
+        add_log("error", f"[{safe_empresa.title()}] Error en generador de QR: {e}")
     finally:
         with qr_lock:
-            qr_state["is_active"] = False
+            qr_state[safe_empresa]["is_active"] = False
 
 @app.route("/api/whatsapp/status", methods=["GET"])
 def api_whatsapp_status():
-    global whatsapp_autenticado
-    # Si la carpeta de sesión existe con archivos y no se marcó falso
-    if whatsapp_autenticado is None:
-        session_activa = os.path.exists(SESSION_DIR) and len(os.listdir(SESSION_DIR)) > 0
-        whatsapp_autenticado = session_activa
-
+    empresa = request.args.get("empresa", "contidep").strip().lower()
+    if empresa not in qr_state:
+        empresa = "contidep"
+    with qr_lock:
+        q = dict(qr_state[empresa])
     return jsonify({
         "success": True,
-        "authenticated": bool(whatsapp_autenticado),
-        "is_scanning": bool(qr_state["is_active"]),
-        "status_text": qr_state["status_text"]
+        "empresa": empresa,
+        "authenticated": bool(whatsapp_autenticado.get(empresa, False)),
+        "is_scanning": bool(q["is_active"]),
+        "status_text": q["status_text"],
+        "empresas_status": {
+            "contidep": bool(whatsapp_autenticado.get("contidep", False)),
+            "medcapital": bool(whatsapp_autenticado.get("medcapital", False))
+        }
     })
 
 @app.route("/api/whatsapp/qr", methods=["GET"])
 def api_whatsapp_qr():
-    global whatsapp_autenticado
-    if not qr_state["is_active"] and not whatsapp_autenticado:
-        t = threading.Thread(target=qr_worker, daemon=True)
+    empresa = request.args.get("empresa", "contidep").strip().lower()
+    if empresa not in qr_state:
+        empresa = "contidep"
+
+    with qr_lock:
+        is_active = qr_state[empresa]["is_active"]
+
+    if not is_active and not whatsapp_autenticado.get(empresa, False):
+        t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa}, daemon=True)
         t.start()
 
     with qr_lock:
+        q = dict(qr_state[empresa])
         return jsonify({
             "success": True,
-            "authenticated": bool(whatsapp_autenticado),
-            "is_active": bool(qr_state["is_active"]),
-            "qr": qr_state["qr_base64"],
-            "status_text": qr_state["status_text"],
-            "error": qr_state["error"]
+            "empresa": empresa,
+            "authenticated": bool(whatsapp_autenticado.get(empresa, False)),
+            "is_active": bool(q["is_active"]),
+            "qr": q["qr_base64"],
+            "status_text": q["status_text"],
+            "error": q["error"]
         })
 
 @app.route("/api/whatsapp/desconectar", methods=["POST"])
 def api_whatsapp_desconectar():
-    global whatsapp_autenticado
-    whatsapp_autenticado = False
+    data = request.get_json(silent=True) or {}
+    empresa = request.args.get("empresa") or data.get("empresa", "contidep")
+    safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
+    with qr_lock:
+        whatsapp_autenticado[safe_empresa] = False
+        qr_state[safe_empresa]["authenticated"] = False
+        qr_state[safe_empresa]["qr_base64"] = None
+        qr_state[safe_empresa]["is_active"] = False
+        qr_state[safe_empresa]["status_text"] = f"Sesión de {safe_empresa.title()} desconectada."
+        qr_state[safe_empresa]["error"] = None
     try:
         forzar_cierre_playwright()
         import shutil
-        if os.path.exists(SESSION_DIR):
-            shutil.rmtree(SESSION_DIR, ignore_errors=True)
-        add_log("info", "Sesión de WhatsApp cerrada y limpiada.")
-        return jsonify({"success": True, "message": "Sesión desconectada"})
+        sdir = get_session_dir(safe_empresa)
+        if os.path.exists(sdir):
+            shutil.rmtree(sdir, ignore_errors=True)
+        add_log("info", f"[{safe_empresa.title()}] Sesión de WhatsApp cerrada y limpiada.")
+        return jsonify({"success": True, "message": f"Sesión de {safe_empresa.title()} desvinculada exitosamente."})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
