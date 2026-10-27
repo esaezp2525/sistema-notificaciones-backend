@@ -768,6 +768,12 @@ function renderDestinatarios() {
   const mobileContainer = document.getElementById('dest-mobile-cards');
   if (!tbody && !mobileContainer) return;
 
+  const searchInput = document.getElementById('filtro-destinatarios');
+  if (searchInput && (searchInput.value.toLowerCase() === 'admin')) {
+    searchInput.value = '';
+    searchQuery = '';
+  }
+
   let filtrados = destinatariosData.filter(d => {
     if (!searchQuery) return true;
     return (d.nombre || '').toLowerCase().includes(searchQuery);

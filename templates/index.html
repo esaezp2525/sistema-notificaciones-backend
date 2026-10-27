@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=17">
+  <link rel="stylesheet" href="/style.css?v=18">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -155,10 +155,10 @@
             </div>
 
             <div class="toolbar-right">
-              <div class="search-input-wrapper">
+              <form class="search-input-wrapper" onsubmit="return false;" autocomplete="off">
                 <span class="search-icon">🔍</span>
-                <input type="search" id="filtro-destinatarios" placeholder="Buscar destinatario o grupo..." class="table-search" autocomplete="off" autocorrect="off" spellcheck="false">
-              </div>
+                <input type="search" id="filtro-destinatarios" name="search_no_autofill" placeholder="Buscar destinatario o grupo..." class="table-search" autocomplete="new-password" autocorrect="off" spellcheck="false">
+              </form>
             </div>
           </div>
 
@@ -787,6 +787,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=17"></script>
+  <script src="/app.js?v=18"></script>
 </body>
 </html>
