@@ -762,23 +762,34 @@ function iniciarPollingLogs() {
 // ==================== RENDERIZAR TABLA & CHECKLIST ====================
 function renderDestinatarios() {
   const tbody = document.getElementById('tbody-destinatarios');
-  if (!tbody) return;
+  const mobileContainer = document.getElementById('dest-mobile-cards');
+  if (!tbody && !mobileContainer) return;
 
   let filtrados = destinatariosData.filter(d => {
     if (!searchQuery) return true;
-    return d.nombre.toLowerCase().includes(searchQuery);
+    return (d.nombre || '').toLowerCase().includes(searchQuery);
   });
 
   if (filtrados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state-cell">No se encontraron destinatarios para esta empresa.</td></tr>`;
+    if (tbody) tbody.innerHTML = `<tr><td colspan="8" class="empty-state-cell">No se encontraron destinatarios para esta empresa.</td></tr>`;
+    if (mobileContainer) {
+      mobileContainer.innerHTML = `
+        <div style="padding: 32px 16px; text-align: center; color: #94a3b8; background: #ffffff; border-radius: 12px; border: 1px dashed #cbd5e1;">
+          <div style="font-size: 32px; margin-bottom: 6px;">👥</div>
+          <p style="font-size: 13.5px; font-weight: 500; color: #64748b; margin: 0;">No se encontraron destinatarios.</p>
+        </div>
+      `;
+    }
     return;
   }
 
-  let html = '';
+  let tableHtml = '';
+  let mobileHtml = '';
+
   filtrados.forEach((d, idx) => {
     let checklistHtml = '';
     if (automatizacionesData.length === 0) {
-      checklistHtml = '<span style="color: #94a3b8; font-size: 11.5px; font-style: italic;">Sin automatizaciones</span>';
+      checklistHtml = '<span style="color: #94a3b8; font-size: 11.5px; font-style: italic;">Sin reglas configuradas</span>';
     } else {
       checklistHtml = '<div class="auto-checklist-chips">';
       automatizacionesData.forEach(auto => {
@@ -787,7 +798,7 @@ function renderDestinatarios() {
           <button type="button" 
                   class="auto-check-chip ${activa ? 'active' : ''}" 
                   onclick="toggleAutoCheck(${d.id}, '${auto.id}')"
-                  title="${activa ? 'Asignada (Clic para quitar)' : 'No asignada (Clic para asignar)'}">
+                  title="${activa ? 'Regla activa (Toca para desactivar)' : 'Inactiva (Toca para activar)'}">
             <span class="chip-dot"></span>
             ${escapeHtml(auto.nombre)}
           </button>
@@ -797,15 +808,21 @@ function renderDestinatarios() {
     }
 
     let badgeClass = 'badge-pending';
-    if (d.estado.toLowerCase() === 'enviado') badgeClass = 'badge-success';
-    else if (d.estado.toLowerCase().includes('error')) badgeClass = 'badge-error';
+    const st = (d.estado || '').toLowerCase();
+    if (st === 'enviado') badgeClass = 'badge-success';
+    else if (st.includes('error')) badgeClass = 'badge-error';
 
-    html += `
+    // 1. Fila para Desktop Table
+    tableHtml += `
       <tr>
         <td style="color: #94a3b8; font-size: 11.5px;">${idx + 1}</td>
         <td><strong>${escapeHtml(d.nombre)}</strong></td>
         <td><span class="type-pill ${d.tipo === 'Grupo' ? 'type-group' : 'type-contact'}">${d.tipo}</span></td>
-        <td style="text-align: center;"><span style="font-size: 14px;">${d.activo ? '✅' : '⚪'}</span></td>
+        <td style="text-align: center;">
+          <button type="button" class="btn-toggle-switch ${d.activo ? 'on' : 'off'}" onclick="toggleDestActivo(${d.id})" title="Clic para alternar">
+            ${d.activo ? '✅ Activo' : '⚪ Pausa'}
+          </button>
+        </td>
         <td>${checklistHtml}</td>
         <td><span class="status-badge ${badgeClass}">${escapeHtml(d.estado)}</span></td>
         <td style="font-size: 11.5px; color: #64748b;">${d.fecha || '—'}</td>
@@ -817,10 +834,78 @@ function renderDestinatarios() {
         </td>
       </tr>
     `;
+
+    // 2. Tarjeta Interactiva para Móviles (Mobile-First)
+    mobileHtml += `
+      <div class="dest-mobile-card ${d.activo ? '' : 'dest-card-paused'}">
+        <div class="dest-card-header">
+          <div class="dest-card-title-box">
+            <span class="dest-index-badge">#${idx + 1}</span>
+            <div style="min-width: 0; flex: 1;">
+              <h4 class="dest-card-name">${escapeHtml(d.nombre)}</h4>
+              <div class="dest-card-tags-row">
+                <span class="type-pill ${d.tipo === 'Grupo' ? 'type-group' : 'type-contact'}">${d.tipo}</span>
+                <span class="status-badge ${badgeClass}">${escapeHtml(d.estado)}</span>
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn-mobile-active-toggle ${d.activo ? 'active' : 'paused'}" onclick="toggleDestActivo(${d.id})" title="Toca para cambiar estado">
+            ${d.activo ? '✅ Activo' : '⚪ Pausa'}
+          </button>
+        </div>
+
+        <div class="dest-card-body">
+          <div class="dest-autos-section">
+            <div class="dest-autos-header">
+              <span class="dest-autos-title">⚡ Automatizaciones Asignadas:</span>
+              <span class="dest-autos-subhint">Toca para activar/desactivar</span>
+            </div>
+            ${checklistHtml}
+          </div>
+        </div>
+
+        <div class="dest-card-footer">
+          <div class="dest-card-date-info">
+            <span>📅 ${d.fecha ? 'Último envío: ' + d.fecha : 'Sin envíos registrados'}</span>
+          </div>
+          <div class="dest-card-btn-actions">
+            <button type="button" class="btn-card-action" onclick="editarDestinatario('${d.id}')">✏️ Editar</button>
+            <button type="button" class="btn-card-action danger" onclick="eliminarDestinatario('${d.id}')">🗑️</button>
+          </div>
+        </div>
+      </div>
+    `;
   });
 
-  tbody.innerHTML = html;
+  if (tbody) tbody.innerHTML = tableHtml;
+  if (mobileContainer) mobileContainer.innerHTML = mobileHtml;
 }
+
+window.toggleDestActivo = async function(destId) {
+  const d = destinatariosData.find(x => x.id === destId);
+  if (!d) return;
+  d.activo = !d.activo;
+
+  try {
+    await fetch(getApiEndpoint('/api/destinatarios/guardar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: d.id,
+        nombre: d.nombre,
+        tipo: d.tipo,
+        activo: d.activo,
+        empresa_id: currentEmpresa
+      })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al toggle activo:", err);
+  }
+
+  localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
+  showToast(`${d.nombre}: ${d.activo ? 'Activado' : 'Pausado'}`, 'info');
+  actualizarUI();
+};
 
 window.toggleAutoCheck = async function(destId, autoId) {
   const dest = destinatariosData.find(x => x.id === destId);
