@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=7">
+  <link rel="stylesheet" href="/style.css?v=8">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -49,6 +49,18 @@
       </div>
 
       <div class="header-right">
+        <!-- SELECTOR DE EMPRESA -->
+        <div class="empresa-selector-pill" id="empresa-selector-box">
+          <span class="empresa-selector-icon" id="empresa-active-icon">🏢</span>
+          <div class="empresa-selector-inner">
+            <span class="empresa-selector-sub">Empresa Activa</span>
+            <select id="select-empresa-activa" class="select-empresa-dropdown" title="Selecciona la empresa para gestionar sus envíos y WhatsApp">
+              <option value="contidep" selected>🏢 Contidep</option>
+              <option value="medcapital">🏥 Medcapital</option>
+            </select>
+          </div>
+        </div>
+
         <!-- ESTADO DE WHATSAPP -->
         <div class="wa-status-pill" id="wa-status-box">
           <span class="status-dot" id="wa-status-dot"></span>
@@ -567,7 +579,7 @@
   <div class="modal-backdrop" id="modal-qr-whatsapp">
     <div class="modal-box" style="max-width: 440px; text-align: center;">
       <div class="modal-header">
-        <h3>📲 Vincular WhatsApp Web</h3>
+        <h3>📲 Vincular WhatsApp - <span id="modal-qr-empresa-nombre" style="color: #2563eb;">Contidep</span></h3>
         <button class="modal-close-btn" id="btn-cerrar-modal-qr">✕</button>
       </div>
       <div class="modal-body" style="padding: 24px 20px;">
@@ -589,7 +601,8 @@
           <p style="font-size: 13px; color: #64748b;">Tu sesión en la nube está activa y lista para enviar.</p>
         </div>
       </div>
-      <div class="modal-footer" style="justify-content: center;">
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button type="button" class="btn-dialog danger" id="btn-desconectar-wa-empresa" style="display: none;">Desconectar Sesión</button>
         <button type="button" class="btn-dialog secondary" id="btn-cancelar-modal-qr">Cerrar</button>
       </div>
     </div>
@@ -597,6 +610,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=7"></script>
+  <script src="/app.js?v=8"></script>
 </body>
 </html>

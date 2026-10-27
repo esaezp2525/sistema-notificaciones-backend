@@ -104,9 +104,48 @@ def init_db():
         automatizacion_id TEXT,
         estado TEXT NOT NULL,
         fecha_hora TEXT NOT NULL,
-        detalle TEXT
+        detalle TEXT,
+        empresa_id TEXT DEFAULT 'contidep'
     )
     """)
+
+    # 7. Tabla de Empresas
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS empresas (
+        id TEXT PRIMARY KEY,
+        nombre TEXT NOT NULL,
+        color TEXT DEFAULT '#2563eb'
+    )
+    """)
+    cursor.execute("INSERT OR IGNORE INTO empresas (id, nombre, color) VALUES ('contidep', 'Contidep', '#2563eb')")
+    cursor.execute("INSERT OR IGNORE INTO empresas (id, nombre, color) VALUES ('medcapital', 'Medcapital', '#10b981')")
+
+    # MIGRACIÓN: Asegurar columna empresa_id en todas las tablas
+    for tabla in ["destinatarios", "notificaciones", "automatizaciones", "historial_envios"]:
+        cursor.execute(f"PRAGMA table_info({tabla})")
+        cols = [col["name"] for col in cursor.fetchall()]
+        if "empresa_id" not in cols:
+            cursor.execute(f"ALTER TABLE {tabla} ADD COLUMN empresa_id TEXT DEFAULT 'contidep'")
+
+    # Sembrar datos para Medcapital si no existen
+    cursor.execute("SELECT COUNT(*) as count FROM notificaciones WHERE empresa_id = 'medcapital'")
+    if cursor.fetchone()["count"] == 0:
+        now_str = datetime.now().strftime("%Y-%m-%d")
+        cursor.execute(
+            "INSERT INTO notificaciones (id, titulo, cuerpo, fecha_creacion, empresa_id) VALUES (?, ?, ?, ?, ?)",
+            ("notif_med_1", "Recordatorio de Pago Medcapital", "Estimado/a {nombre}: Le recordamos gestionar su pago mensual con Medcapital.", now_str, "medcapital")
+        )
+        cursor.execute(
+            "INSERT INTO automatizaciones (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            ("auto_med_1", "Aviso Mensual Medcapital (Día 20)", "notif_med_1", 20, "calendario", "09:30", 1, 1, "", "medcapital")
+        )
+
+    cursor.execute("SELECT COUNT(*) as count FROM destinatarios WHERE empresa_id = 'medcapital'")
+    if cursor.fetchone()["count"] == 0:
+        cursor.execute(
+            "INSERT INTO destinatarios (nombre, tipo, activo, automatizaciones, estado_envio, fecha_envio, empresa_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            ("Grupo Avisos Medcapital", "Grupo", 1, "auto_med_1", "Pendiente", "", "medcapital")
+        )
 
     conn.commit()
 
@@ -253,17 +292,27 @@ def eliminar_usuario(user_id, req_user_id):
     conn.close()
     return True, "Usuario eliminado"
 
+def db_obtener_empresas():
+    return [
+        {"id": "contidep", "nombre": "Contidep", "color": "#2563eb"},
+        {"id": "medcapital", "nombre": "Medcapital", "color": "#10b981"}
+    ]
+
 # ==================== MÉTODOS DE DESTINATARIOS ====================
-def db_obtener_destinatarios():
+def db_obtener_destinatarios(empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM destinatarios ORDER BY id ASC")
+    if empresa_id:
+        cursor.execute("SELECT * FROM destinatarios WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM destinatarios ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     resultado = []
     for r in rows:
         aut_str = r["automatizaciones"] or ""
         aut_list = [x.strip() for x in aut_str.split(",") if x.strip()]
+        emp_id = r["empresa_id"] if "empresa_id" in r.keys() else "contidep"
         resultado.append({
             "id": r["id"],
             "nombre": r["nombre"],
@@ -271,30 +320,37 @@ def db_obtener_destinatarios():
             "activo": bool(r["activo"]),
             "automatizaciones": aut_list,
             "estado": r["estado_envio"] or "Pendiente",
-            "fecha": r["fecha_envio"] or ""
+            "fecha": r["fecha_envio"] or "",
+            "empresa_id": emp_id
         })
     return resultado
 
-def db_guardar_destinatario(nombre, tipo="Grupo", activo=True, auto_ids=None):
+def db_guardar_destinatario(nombre, tipo="Grupo", activo=True, auto_ids=None, empresa_id="contidep"):
     if auto_ids is None:
         auto_ids = []
     auto_str = ",".join(auto_ids)
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO destinatarios (nombre, tipo, activo, automatizaciones, estado_envio, fecha_envio) VALUES (?, ?, ?, ?, 'Pendiente', '')",
-        (nombre.strip(), tipo, 1 if activo else 0, auto_str)
+        "INSERT INTO destinatarios (nombre, tipo, activo, automatizaciones, estado_envio, fecha_envio, empresa_id) VALUES (?, ?, ?, ?, 'Pendiente', '', ?)",
+        (nombre.strip(), tipo, 1 if activo else 0, auto_str, empresa_id)
     )
     conn.commit()
     conn.close()
 
-def db_actualizar_destinatario(dest_id, nombre, tipo="Grupo", activo=True):
+def db_actualizar_destinatario(dest_id, nombre, tipo="Grupo", activo=True, empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(
-        "UPDATE destinatarios SET nombre = ?, tipo = ?, activo = ? WHERE id = ?",
-        (nombre.strip(), tipo, 1 if activo else 0, dest_id)
-    )
+    if empresa_id:
+        cursor.execute(
+            "UPDATE destinatarios SET nombre = ?, tipo = ?, activo = ?, empresa_id = ? WHERE id = ?",
+            (nombre.strip(), tipo, 1 if activo else 0, empresa_id, dest_id)
+        )
+    else:
+        cursor.execute(
+            "UPDATE destinatarios SET nombre = ?, tipo = ?, activo = ? WHERE id = ?",
+            (nombre.strip(), tipo, 1 if activo else 0, dest_id)
+        )
     conn.commit()
     conn.close()
 
@@ -345,15 +401,18 @@ def db_sincronizar_a_excel():
         print(f"[DB] Error sincronizando a Excel: {e}")
 
 # ==================== MÉTODOS DE PLANTILLAS Y AUTOMATIZACIONES ====================
-def db_obtener_notificaciones():
+def db_obtener_notificaciones(empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM notificaciones ORDER BY id ASC")
+    if empresa_id:
+        cursor.execute("SELECT * FROM notificaciones WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM notificaciones ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
-def db_guardar_notificacion(nid, titulo, cuerpo):
+def db_guardar_notificacion(nid, titulo, cuerpo, empresa_id="contidep"):
     conn = get_db_connection()
     cursor = conn.cursor()
     if not nid:
@@ -367,8 +426,8 @@ def db_guardar_notificacion(nid, titulo, cuerpo):
     
     now_str = datetime.now().strftime("%Y-%m-%d")
     cursor.execute(
-        "INSERT OR REPLACE INTO notificaciones (id, titulo, cuerpo, fecha_creacion) VALUES (?, ?, ?, ?)",
-        (nid, titulo.strip(), cuerpo.strip(), now_str)
+        "INSERT OR REPLACE INTO notificaciones (id, titulo, cuerpo, fecha_creacion, empresa_id) VALUES (?, ?, ?, ?, ?)",
+        (nid, titulo.strip(), cuerpo.strip(), now_str, empresa_id)
     )
     conn.commit()
     conn.close()
@@ -382,10 +441,13 @@ def db_eliminar_notificacion(nid):
     conn.commit()
     conn.close()
 
-def db_obtener_automatizaciones():
+def db_obtener_automatizaciones(empresa_id=None):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM automatizaciones ORDER BY id ASC")
+    if empresa_id:
+        cursor.execute("SELECT * FROM automatizaciones WHERE empresa_id = ? ORDER BY id ASC", (empresa_id,))
+    else:
+        cursor.execute("SELECT * FROM automatizaciones ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
     res = []
@@ -396,7 +458,7 @@ def db_obtener_automatizaciones():
         res.append(d)
     return res
 
-def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual):
+def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, empresa_id="contidep"):
     conn = get_db_connection()
     cursor = conn.cursor()
     if not aid:
@@ -409,9 +471,9 @@ def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, h
 
     cursor.execute(
         """INSERT OR REPLACE INTO automatizaciones 
-        (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT ultimo_envio_periodo FROM automatizaciones WHERE id = ?), ''))""",
-        (aid, nombre.strip(), mensaje_id, int(dia_mes), modalidad_dia, hora.strip(), 1 if activo else 0, 1 if repetir_mensual else 0, aid)
+        (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo, empresa_id) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT ultimo_envio_periodo FROM automatizaciones WHERE id = ?), ''), ?)""",
+        (aid, nombre.strip(), mensaje_id, int(dia_mes), modalidad_dia, hora.strip(), 1 if activo else 0, 1 if repetir_mensual else 0, aid, empresa_id)
     )
     conn.commit()
     conn.close()

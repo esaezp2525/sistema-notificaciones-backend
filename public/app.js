@@ -1,5 +1,6 @@
 // ========================================================
 // SISTEMA DE NOTIFICACIONES — WEB APP (FIREBASE HOSTING)
+// MULTI-EMPRESA: CONTIDEP & MEDCAPITAL
 // ========================================================
 
 const STORAGE_KEY_AUTH = 'notif_web_auth';
@@ -8,9 +9,16 @@ const STORAGE_KEY_MSGS = 'notif_web_mensajes';
 const STORAGE_KEY_AUTOS = 'notif_web_autos';
 const STORAGE_KEY_USERS = 'notif_web_users';
 const STORAGE_KEY_API = 'notif_web_api_url';
+const STORAGE_KEY_EMPRESA = 'notif_empresa_activa';
 
 const DEFAULT_CLOUD_API = 'https://sistema-notificaciones-backend.onrender.com';
 
+const EMPRESAS_CONFIG = {
+  contidep: { id: 'contidep', nombre: 'Contidep', icon: '🏢', color: '#2563eb' },
+  medcapital: { id: 'medcapital', nombre: 'Medcapital', icon: '🏥', color: '#10b981' }
+};
+
+let currentEmpresa = localStorage.getItem(STORAGE_KEY_EMPRESA) || 'contidep';
 let currentUser = null;
 let savedApi = localStorage.getItem(STORAGE_KEY_API);
 if (!savedApi || (window.location.protocol === 'https:' && savedApi.startsWith('http:')) || savedApi.includes('127.0.0.1') || savedApi.includes('localhost')) {
@@ -18,6 +26,7 @@ if (!savedApi || (window.location.protocol === 'https:' && savedApi.startsWith('
   localStorage.setItem(STORAGE_KEY_API, DEFAULT_CLOUD_API);
 }
 let apiUrl = savedApi;
+
 let destinatariosData = [];
 let notificacionesData = [];
 let automatizacionesData = [];
@@ -25,6 +34,28 @@ let usuariosData = [];
 let searchQuery = '';
 let pollInterval = null;
 let confirmActionCallback = null;
+let qrPollInterval = null;
+let logsPollInterval = null;
+
+// ==================== SELECTOR DE EMPRESA ====================
+function actualizarSelectorEmpresa() {
+  const select = document.getElementById('select-empresa-activa');
+  const icon = document.getElementById('empresa-active-icon');
+  const box = document.getElementById('empresa-selector-box');
+  const qrName = document.getElementById('modal-qr-empresa-nombre');
+
+  if (select) select.value = currentEmpresa;
+  const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
+  if (icon) icon.textContent = cfg.icon;
+  if (box) {
+    if (currentEmpresa === 'medcapital') box.classList.add('medcapital');
+    else box.classList.remove('medcapital');
+  }
+  if (qrName) {
+    qrName.textContent = cfg.nombre;
+    qrName.style.color = cfg.color;
+  }
+}
 
 // ==================== DATOS INICIALES ====================
 function initDefaultStorage() {
@@ -36,28 +67,47 @@ function initDefaultStorage() {
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(initialUsers));
   }
 
-  if (!localStorage.getItem(STORAGE_KEY_MSGS)) {
+  // Contidep
+  if (!localStorage.getItem(`${STORAGE_KEY_MSGS}_contidep`)) {
     const initialMsgs = [
-      { id: 'notif_1', titulo: 'Recordatorio General', cuerpo: 'Hola {nombre}, te recordamos que tienes una notificación pendiente. Por favor confírmanos tu recepción. ¡Muchas gracias!', fecha_creacion: '2026-10-26' },
-      { id: 'notif_2', titulo: 'Aviso de Pago / Vencimiento', cuerpo: 'Estimado/a {nombre}: Le recordamos que hoy vence el plazo programado. Recuerde gestionarlo a tiempo.', fecha_creacion: '2026-10-26' }
+      { id: 'notif_1', titulo: 'Recordatorio General Contidep', cuerpo: 'Hola {nombre}, te recordamos que tienes una notificación pendiente de Contidep. Por favor confírmanos tu recepción. ¡Muchas gracias!', fecha_creacion: '2026-10-26' },
+      { id: 'notif_2', titulo: 'Aviso de Pago Contidep', cuerpo: 'Estimado/a {nombre}: Le recordamos que hoy vence el plazo de pago mensual con Contidep.', fecha_creacion: '2026-10-26' }
     ];
-    localStorage.setItem(STORAGE_KEY_MSGS, JSON.stringify(initialMsgs));
+    localStorage.setItem(`${STORAGE_KEY_MSGS}_contidep`, JSON.stringify(initialMsgs));
   }
-
-  if (!localStorage.getItem(STORAGE_KEY_AUTOS)) {
+  if (!localStorage.getItem(`${STORAGE_KEY_AUTOS}_contidep`)) {
     const initialAutos = [
       { id: 'auto_1', nombre: 'Recordatorio Mensual (Día 4 Hábil)', mensaje_id: 'notif_1', dia_mes: 4, hora: '09:00', modalidad_dia: 'habil', activo: true, repetir_mensual: true, ultimo_envio_periodo: '' },
       { id: 'auto_2', nombre: 'Aviso de Pago (Día 20 Calendario)', mensaje_id: 'notif_2', dia_mes: 20, hora: '12:00', modalidad_dia: 'calendario', activo: true, repetir_mensual: true, ultimo_envio_periodo: '' }
     ];
-    localStorage.setItem(STORAGE_KEY_AUTOS, JSON.stringify(initialAutos));
+    localStorage.setItem(`${STORAGE_KEY_AUTOS}_contidep`, JSON.stringify(initialAutos));
   }
-
-  if (!localStorage.getItem(STORAGE_KEY_DEST)) {
+  if (!localStorage.getItem(`${STORAGE_KEY_DEST}_contidep`)) {
     const initialDest = [
       { id: 1, nombre: 'Grupo Contabilidad y Pagos', tipo: 'Grupo', activo: true, automatizaciones: ['auto_1', 'auto_2'], estado: 'Pendiente', fecha: '' },
-      { id: 2, nombre: 'Avisos Administrativos', tipo: 'Grupo', activo: true, automatizaciones: ['auto_1'], estado: 'Pendiente', fecha: '' }
+      { id: 2, nombre: 'Avisos Administrativos Contidep', tipo: 'Grupo', activo: true, automatizaciones: ['auto_1'], estado: 'Pendiente', fecha: '' }
     ];
-    localStorage.setItem(STORAGE_KEY_DEST, JSON.stringify(initialDest));
+    localStorage.setItem(`${STORAGE_KEY_DEST}_contidep`, JSON.stringify(initialDest));
+  }
+
+  // Medcapital
+  if (!localStorage.getItem(`${STORAGE_KEY_MSGS}_medcapital`)) {
+    const initialMedMsgs = [
+      { id: 'notif_med_1', titulo: 'Recordatorio de Pago Medcapital', cuerpo: 'Estimado/a {nombre}: Le recordamos gestionar su pago mensual con Medcapital.', fecha_creacion: '2026-10-26' }
+    ];
+    localStorage.setItem(`${STORAGE_KEY_MSGS}_medcapital`, JSON.stringify(initialMedMsgs));
+  }
+  if (!localStorage.getItem(`${STORAGE_KEY_AUTOS}_medcapital`)) {
+    const initialMedAutos = [
+      { id: 'auto_med_1', nombre: 'Aviso Mensual Medcapital (Día 20)', mensaje_id: 'notif_med_1', dia_mes: 20, hora: '09:30', modalidad_dia: 'calendario', activo: true, repetir_mensual: true, ultimo_envio_periodo: '' }
+    ];
+    localStorage.setItem(`${STORAGE_KEY_AUTOS}_medcapital`, JSON.stringify(initialMedAutos));
+  }
+  if (!localStorage.getItem(`${STORAGE_KEY_DEST}_medcapital`)) {
+    const initialMedDest = [
+      { id: 101, nombre: 'Grupo Avisos Medcapital', tipo: 'Grupo', activo: true, automatizaciones: ['auto_med_1'], estado: 'Pendiente', fecha: '' }
+    ];
+    localStorage.setItem(`${STORAGE_KEY_DEST}_medcapital`, JSON.stringify(initialMedDest));
   }
 }
 
@@ -67,6 +117,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupTabs();
   setupEventListeners();
   verificarSesion();
+  iniciarPollingLogs();
 });
 
 // ==================== AUTENTICACIÓN ====================
@@ -89,6 +140,7 @@ function verificarSesion() {
         tabUsuarios.style.display = 'none';
       }
 
+      actualizarSelectorEmpresa();
       cargarDatos();
       verificarEstadoWhatsApp();
       return;
@@ -121,6 +173,17 @@ function setupTabs() {
 
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
+  // Selector de empresa activa
+  document.getElementById('select-empresa-activa')?.addEventListener('change', (e) => {
+    currentEmpresa = e.target.value;
+    localStorage.setItem(STORAGE_KEY_EMPRESA, currentEmpresa);
+    actualizarSelectorEmpresa();
+    const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
+    showToast(`Empresa activa: ${cfg.nombre}`, 'info');
+    cargarDatos();
+    verificarEstadoWhatsApp();
+  });
+
   // Login
   document.getElementById('form-login')?.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -182,6 +245,17 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-envio')?.addEventListener('click', () => cerrarModal('modal-enviar-ahora'));
   document.getElementById('btn-confirmar-disparo')?.addEventListener('click', confirmarDisparoEnvio);
 
+  // Detener envío
+  document.getElementById('btn-detener-envio')?.addEventListener('click', async () => {
+    try {
+      const res = await fetch(getApiEndpoint('/api/enviar/detener'), { method: 'POST' });
+      const data = await res.json();
+      showToast(data.message || 'Deteniendo proceso...', 'warning');
+    } catch (e) {
+      showToast('No se pudo enviar orden de detención', 'error');
+    }
+  });
+
   document.getElementById('btn-modal-mi-clave')?.addEventListener('click', () => {
     document.getElementById('clave-actual').value = '';
     document.getElementById('clave-nueva').value = '';
@@ -219,17 +293,29 @@ function setupEventListeners() {
     localStorage.setItem(STORAGE_KEY_API, apiUrl);
     showToast('Configuración de servidor guardada.', 'success');
     cerrarModal('modal-config-servidor');
+    cargarDatos();
+    verificarEstadoWhatsApp();
   });
 
   // Reiniciar estados
   document.getElementById('btn-reiniciar-estados')?.addEventListener('click', () => {
+    const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
     solicitarConfirmacion(
       '¿Reiniciar estados?',
-      '¿Restablecer el estado de todos los destinatarios a "Pendiente"?',
-      () => {
+      `¿Restablecer el estado de los destinatarios de ${cfg.nombre} a "Pendiente"?`,
+      async () => {
+        try {
+          await fetch(getApiEndpoint(`/api/destinatarios/reiniciar-estados?empresa=${currentEmpresa}`), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ empresa: currentEmpresa })
+          });
+        } catch (err) {
+          console.warn("Backend no disponible al reiniciar estados:", err);
+        }
         destinatariosData.forEach(d => { d.estado = 'Pendiente'; d.fecha = ''; });
-        localStorage.setItem(STORAGE_KEY_DEST, JSON.stringify(destinatariosData));
-        showToast('Estados reiniciados a Pendiente.', 'success');
+        localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
+        showToast(`Estados de ${cfg.nombre} reiniciados a Pendiente.`, 'success');
         cargarDatos();
       }
     );
@@ -274,16 +360,39 @@ function setupEventListeners() {
   document.getElementById('btn-cerrar-modal-qr')?.addEventListener('click', cerrarModalQR);
   document.getElementById('btn-cancelar-modal-qr')?.addEventListener('click', cerrarModalQR);
 
+  // Desconectar sesión de la empresa activa
+  document.getElementById('btn-desconectar-wa-empresa')?.addEventListener('click', () => {
+    const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
+    solicitarConfirmacion(
+      `¿Desconectar WhatsApp de ${cfg.nombre}?`,
+      `Esta acción cerrará la sesión de WhatsApp para ${cfg.nombre}. La otra empresa seguirá conectada independientemente.`,
+      async () => {
+        try {
+          const res = await fetch(getApiEndpoint('/api/whatsapp/desconectar'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ empresa: currentEmpresa })
+          });
+          const data = await res.json();
+          showToast(data.message || 'Sesión desconectada', 'info');
+          cerrarModalQR();
+          verificarEstadoWhatsApp();
+        } catch (err) {
+          showToast('Error al desconectar sesión', 'error');
+        }
+      }
+    );
+  });
+
   // Limpiar consola
   document.getElementById('btn-limpiar-consola')?.addEventListener('click', () => {
     document.getElementById('terminal-body').innerHTML = '';
+    fetch(getApiEndpoint('/api/logs/limpiar'), { method: 'POST' }).catch(() => {});
     showToast('Consola limpiada.', 'info');
   });
 }
 
 // ==================== GESTIÓN DE WHATSAPP EN VIVO ====================
-let qrPollInterval = null;
-
 function getApiEndpoint(path) {
   let base = apiUrl || DEFAULT_CLOUD_API;
   if (window.location.protocol === 'https:' && (base.startsWith('http:') || base.includes('127.0.0.1') || base.includes('localhost'))) {
@@ -295,33 +404,40 @@ function getApiEndpoint(path) {
 async function verificarEstadoWhatsApp() {
   const dot = document.getElementById('wa-status-dot');
   const text = document.getElementById('wa-status-text');
+  const btnDisconnect = document.getElementById('btn-desconectar-wa-empresa');
+  const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
   try {
-    const res = await fetch(getApiEndpoint('/api/whatsapp/status'));
+    const res = await fetch(getApiEndpoint(`/api/whatsapp/status?empresa=${currentEmpresa}`));
     const data = await res.json();
     if (data.authenticated) {
       if (dot) dot.className = 'status-dot online';
-      if (text) text.textContent = 'WhatsApp: Conectado';
+      if (text) text.textContent = `WA ${cfg.nombre}: Conectado`;
+      if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
     } else {
       if (dot) dot.className = 'status-dot offline';
-      if (text) text.textContent = 'WhatsApp: Desconectado';
+      if (text) text.textContent = `WA ${cfg.nombre}: Desconectado`;
+      if (btnDisconnect) btnDisconnect.style.display = 'none';
     }
   } catch (e) {
     if (dot) dot.className = 'status-dot offline';
-    if (text) text.textContent = 'WhatsApp: Sin Motor';
+    if (text) text.textContent = `WA ${cfg.nombre}: Sin Motor`;
+    if (btnDisconnect) btnDisconnect.style.display = 'none';
   }
 }
 
 function abrirModalQR() {
+  actualizarSelectorEmpresa();
   const loadingState = document.getElementById('qr-loading-state');
   const displayContainer = document.getElementById('qr-display-container');
   const successState = document.getElementById('qr-success-state');
   const qrImg = document.getElementById('qr-image-display');
   const statusText = document.getElementById('qr-status-text');
+  const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
 
   if (loadingState) loadingState.style.display = 'block';
   if (displayContainer) displayContainer.style.display = 'none';
   if (successState) successState.style.display = 'none';
-  if (statusText) statusText.textContent = 'Iniciando conexión con WhatsApp...';
+  if (statusText) statusText.textContent = `Iniciando conexión con WhatsApp para ${cfg.nombre}...`;
 
   abrirModal('modal-qr-whatsapp');
 
@@ -329,7 +445,7 @@ function abrirModalQR() {
 
   async function pollQR() {
     try {
-      const res = await fetch(getApiEndpoint('/api/whatsapp/qr'));
+      const res = await fetch(getApiEndpoint(`/api/whatsapp/qr?empresa=${currentEmpresa}`));
       const data = await res.json();
 
       if (data.qr) {
@@ -344,7 +460,7 @@ function abrirModalQR() {
         clearInterval(qrPollInterval);
         qrPollInterval = null;
         verificarEstadoWhatsApp();
-        showToast('¡WhatsApp vinculado exitosamente!', 'success');
+        showToast(`¡WhatsApp de ${cfg.nombre} vinculado exitosamente!`, 'success');
         setTimeout(() => cerrarModal('modal-qr-whatsapp'), 3000);
         return;
       } else if (data.status_text && statusText) {
@@ -352,7 +468,7 @@ function abrirModalQR() {
       }
     } catch (e) {
       if (statusText) {
-        statusText.innerHTML = `No se pudo conectar con el motor.<br><span style="font-size:12px; color:#ef4444;">Configura la URL de tu motor en ⚙️ Conexión.</span>`;
+        statusText.innerHTML = `No se pudo conectar con el motor.<br><span style="font-size:12px; color:#ef4444;">Configura la URL de tu motor en ⚙️ Servidor.</span>`;
       }
     }
   }
@@ -370,11 +486,34 @@ function cerrarModalQR() {
 }
 
 // ==================== CARGAR DATOS ====================
-function cargarDatos() {
-  destinatariosData = JSON.parse(localStorage.getItem(STORAGE_KEY_DEST) || '[]');
-  notificacionesData = JSON.parse(localStorage.getItem(STORAGE_KEY_MSGS) || '[]');
-  automatizacionesData = JSON.parse(localStorage.getItem(STORAGE_KEY_AUTOS) || '[]');
+async function cargarDatos() {
+  actualizarSelectorEmpresa();
+  try {
+    const res = await fetch(getApiEndpoint(`/api/data?empresa=${currentEmpresa}`));
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success) {
+        destinatariosData = data.destinatarios || [];
+        notificacionesData = data.notificaciones || [];
+        automatizacionesData = data.automatizaciones || [];
+        localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
+        localStorage.setItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`, JSON.stringify(notificacionesData));
+        localStorage.setItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`, JSON.stringify(automatizacionesData));
+        actualizarUI();
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn("Backend no disponible al cargar datos, usando caché local:", e);
+  }
 
+  destinatariosData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_DEST) || '[]');
+  notificacionesData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_MSGS) || '[]');
+  automatizacionesData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_AUTOS) || '[]');
+  actualizarUI();
+}
+
+function actualizarUI() {
   document.getElementById('badge-total-destinatarios').textContent = destinatariosData.length;
   document.getElementById('badge-total-mensajes').textContent = notificacionesData.length;
   document.getElementById('badge-total-autos').textContent = automatizacionesData.length;
@@ -382,8 +521,8 @@ function cargarDatos() {
   let pendientes = 0, enviados = 0, errores = 0, activos = 0;
   destinatariosData.forEach(d => {
     if (d.activo) activos++;
-    if (d.estado.toLowerCase() === 'enviado') enviados++;
-    else if (d.estado.toLowerCase().includes('error')) errores++;
+    if (String(d.estado).toLowerCase() === 'enviado') enviados++;
+    else if (String(d.estado).toLowerCase().includes('error')) errores++;
     else if (d.activo) pendientes++;
   });
 
@@ -393,14 +532,46 @@ function cargarDatos() {
   document.getElementById('kpi-enviados').textContent = enviados;
   document.getElementById('kpi-errores').textContent = errores;
 
-  const waDot = document.getElementById('wa-status-dot');
-  const waText = document.getElementById('wa-status-text');
-  waDot.className = 'status-dot online';
-  waText.textContent = 'WhatsApp: Motor Activo';
-
   renderDestinatarios();
   renderNotificaciones();
   renderAutomatizaciones();
+}
+
+// ==================== POLLING DE LOGS EN TIEMPO REAL ====================
+function iniciarPollingLogs() {
+  if (logsPollInterval) clearInterval(logsPollInterval);
+  logsPollInterval = setInterval(async () => {
+    try {
+      const res = await fetch(getApiEndpoint('/api/logs'));
+      if (!res.ok) return;
+      const data = await res.json();
+      const terminal = document.getElementById('terminal-body');
+      const btnDetener = document.getElementById('btn-detener-envio');
+      const miniStatus = document.getElementById('mini-progress-status');
+      const taskBadge = document.getElementById('console-current-task');
+
+      if (btnDetener) btnDetener.disabled = !data.is_running;
+      if (miniStatus) miniStatus.textContent = data.is_running ? 'Transmitiendo...' : 'Listo';
+      if (taskBadge) {
+        if (data.is_running && data.tarea_actual) {
+          taskBadge.style.display = 'inline-block';
+          taskBadge.textContent = data.tarea_actual;
+        } else {
+          taskBadge.style.display = 'none';
+        }
+      }
+
+      if (Array.isArray(data.logs) && data.logs.length > 0 && terminal) {
+        terminal.innerHTML = data.logs.map(log => `
+          <div class="log-entry log-${log.level}">
+            <span class="log-time">[${escapeHtml(log.time)}]</span>
+            <span class="log-msg">${escapeHtml(log.msg)}</span>
+          </div>
+        `).join('');
+        terminal.scrollTop = terminal.scrollHeight;
+      }
+    } catch (e) {}
+  }, 3500);
 }
 
 // ==================== RENDERIZAR TABLA & CHECKLIST ====================
@@ -414,7 +585,7 @@ function renderDestinatarios() {
   });
 
   if (filtrados.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state-cell">No se encontraron destinatarios.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" class="empty-state-cell">No se encontraron destinatarios para esta empresa.</td></tr>`;
     return;
   }
 
@@ -466,14 +637,25 @@ function renderDestinatarios() {
   tbody.innerHTML = html;
 }
 
-window.toggleAutoCheck = function(destId, autoId) {
+window.toggleAutoCheck = async function(destId, autoId) {
   const dest = destinatariosData.find(x => x.id === destId);
   if (!dest) return;
   if (!Array.isArray(dest.automatizaciones)) dest.automatizaciones = [];
   const idx = dest.automatizaciones.indexOf(autoId);
   if (idx >= 0) dest.automatizaciones.splice(idx, 1);
   else dest.automatizaciones.push(autoId);
-  localStorage.setItem(STORAGE_KEY_DEST, JSON.stringify(destinatariosData));
+
+  try {
+    await fetch(getApiEndpoint('/api/destinatarios/toggle-auto'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ destinatario_id: destId, auto_id: autoId })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al toggle auto:", err);
+  }
+
+  localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
   renderDestinatarios();
 };
 
@@ -482,7 +664,7 @@ function renderNotificaciones() {
   const grid = document.getElementById('grid-notificaciones');
   if (!grid) return;
   if (notificacionesData.length === 0) {
-    grid.innerHTML = `<div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: #94a3b8;"><p>No tienes plantillas creadas.</p></div>`;
+    grid.innerHTML = `<div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: #94a3b8;"><p>No tienes plantillas creadas para esta empresa.</p></div>`;
     return;
   }
 
@@ -521,7 +703,7 @@ function renderAutomatizaciones() {
   const grid = document.getElementById('grid-automatizaciones');
   if (!grid) return;
   if (automatizacionesData.length === 0) {
-    grid.innerHTML = `<div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: #94a3b8;"><p>No tienes automatizaciones configuradas.</p></div>`;
+    grid.innerHTML = `<div style="grid-column: 1 / -1; padding: 40px; text-align: center; color: #94a3b8;"><p>No tienes automatizaciones configuradas para esta empresa.</p></div>`;
     return;
   }
 
@@ -706,16 +888,25 @@ window.eliminarDestinatario = function(id) {
   solicitarConfirmacion(
     '¿Eliminar destinatario?',
     `¿Estás seguro de que deseas eliminar a "${nombre}" de la lista?`,
-    () => {
+    async () => {
+      try {
+        await fetch(getApiEndpoint('/api/destinatarios/eliminar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: parseInt(id) })
+        });
+      } catch (err) {
+        console.warn("Backend no disponible al eliminar:", err);
+      }
       destinatariosData = destinatariosData.filter(x => String(x.id) !== String(id));
-      localStorage.setItem(STORAGE_KEY_DEST, JSON.stringify(destinatariosData));
+      localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
       showToast(`Destinatario "${nombre}" eliminado con éxito.`, 'info');
       cargarDatos();
     }
   );
 };
 
-function guardarDestinatario() {
+async function guardarDestinatario() {
   const idStr = document.getElementById('dest-id').value;
   const nombre = document.getElementById('dest-nombre').value.trim();
   const tipo = document.getElementById('dest-tipo').value;
@@ -726,16 +917,32 @@ function guardarDestinatario() {
     return;
   }
 
+  try {
+    await fetch(getApiEndpoint('/api/destinatarios/guardar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: idStr ? parseInt(idStr) : undefined,
+        nombre,
+        tipo,
+        activo,
+        empresa_id: currentEmpresa
+      })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al guardar destinatario:", err);
+  }
+
   if (idStr) {
     const id = parseInt(idStr);
     const d = destinatariosData.find(x => x.id === id);
     if (d) { d.nombre = nombre; d.tipo = tipo; d.activo = activo; }
   } else {
     const nextId = destinatariosData.length > 0 ? Math.max(...destinatariosData.map(x => x.id)) + 1 : 1;
-    destinatariosData.push({ id: nextId, nombre, tipo, activo, automatizaciones: [], estado: 'Pendiente', fecha: '' });
+    destinatariosData.push({ id: nextId, nombre, tipo, activo, automatizaciones: [], estado: 'Pendiente', fecha: '', empresa_id: currentEmpresa });
   }
 
-  localStorage.setItem(STORAGE_KEY_DEST, JSON.stringify(destinatariosData));
+  localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
   showToast('Destinatario guardado.', 'success');
   cerrarModal('modal-destinatario');
   cargarDatos();
@@ -760,16 +967,25 @@ window.eliminarNotificacion = function(id) {
   solicitarConfirmacion(
     '¿Eliminar plantilla?',
     `¿Estás seguro de que deseas eliminar la plantilla "${titulo}"?`,
-    () => {
+    async () => {
+      try {
+        await fetch(getApiEndpoint('/api/notificaciones/eliminar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+      } catch (err) {
+        console.warn("Backend no disponible al eliminar plantilla:", err);
+      }
       notificacionesData = notificacionesData.filter(x => String(x.id) !== String(id));
-      localStorage.setItem(STORAGE_KEY_MSGS, JSON.stringify(notificacionesData));
+      localStorage.setItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`, JSON.stringify(notificacionesData));
       showToast(`Plantilla "${titulo}" eliminada.`, 'info');
       cargarDatos();
     }
   );
 };
 
-function guardarNotificacion() {
+async function guardarNotificacion() {
   const id = document.getElementById('notif-id').value;
   const titulo = document.getElementById('notif-input-titulo').value.trim();
   const cuerpo = document.getElementById('notif-input-cuerpo').value.trim();
@@ -779,16 +995,26 @@ function guardarNotificacion() {
     return;
   }
 
+  try {
+    await fetch(getApiEndpoint('/api/notificaciones/guardar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id || undefined, titulo, cuerpo, empresa_id: currentEmpresa })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al guardar plantilla:", err);
+  }
+
   if (id) {
     const n = notificacionesData.find(x => x.id === id);
     if (n) { n.titulo = titulo; n.cuerpo = cuerpo; }
   } else {
     const newId = `notif_${Date.now()}`;
     const fecha = new Date().toISOString().substring(0, 10);
-    notificacionesData.push({ id: newId, titulo, cuerpo, fecha_creacion: fecha });
+    notificacionesData.push({ id: newId, titulo, cuerpo, fecha_creacion: fecha, empresa_id: currentEmpresa });
   }
 
-  localStorage.setItem(STORAGE_KEY_MSGS, JSON.stringify(notificacionesData));
+  localStorage.setItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`, JSON.stringify(notificacionesData));
   showToast('Plantilla guardada.', 'success');
   cerrarModal('modal-notificacion');
   cargarDatos();
@@ -837,22 +1063,31 @@ window.eliminarAutomatizacion = function(id) {
   solicitarConfirmacion(
     '¿Eliminar automatización?',
     `¿Estás seguro de eliminar la regla "${nombre}"? Se desmarcará del checklist de los destinatarios.`,
-    () => {
+    async () => {
+      try {
+        await fetch(getApiEndpoint('/api/automatizaciones/eliminar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id })
+        });
+      } catch (err) {
+        console.warn("Backend no disponible al eliminar auto:", err);
+      }
       automatizacionesData = automatizacionesData.filter(x => String(x.id) !== String(id));
       destinatariosData.forEach(dest => {
         if (Array.isArray(dest.automatizaciones)) {
           dest.automatizaciones = dest.automatizaciones.filter(x => String(x) !== String(id));
         }
       });
-      localStorage.setItem(STORAGE_KEY_AUTOS, JSON.stringify(automatizacionesData));
-      localStorage.setItem(STORAGE_KEY_DEST, JSON.stringify(destinatariosData));
+      localStorage.setItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`, JSON.stringify(automatizacionesData));
+      localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
       showToast(`Automatización "${nombre}" eliminada.`, 'info');
       cargarDatos();
     }
   );
 };
 
-function guardarAutomatizacion() {
+async function guardarAutomatizacion() {
   const id = document.getElementById('auto-id').value;
   const nombre = document.getElementById('auto-input-nombre').value.trim();
   const mensaje_id = document.getElementById('auto-select-mensaje').value;
@@ -865,6 +1100,26 @@ function guardarAutomatizacion() {
   if (!nombre) {
     showToast('El nombre es requerido.', 'error');
     return;
+  }
+
+  try {
+    await fetch(getApiEndpoint('/api/automatizaciones/guardar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: id || undefined,
+        nombre,
+        mensaje_id,
+        dia_mes,
+        modalidad_dia,
+        hora,
+        activo,
+        repetir_mensual,
+        empresa_id: currentEmpresa
+      })
+    });
+  } catch (err) {
+    console.warn("Backend no disponible al guardar auto:", err);
   }
 
   if (id) {
@@ -880,10 +1135,10 @@ function guardarAutomatizacion() {
     }
   } else {
     const newId = `auto_${Date.now()}`;
-    automatizacionesData.push({ id: newId, nombre, mensaje_id, dia_mes, hora, modalidad_dia, repetir_mensual, activo, ultimo_envio_periodo: '' });
+    automatizacionesData.push({ id: newId, nombre, mensaje_id, dia_mes, hora, modalidad_dia, repetir_mensual, activo, ultimo_envio_periodo: '', empresa_id: currentEmpresa });
   }
 
-  localStorage.setItem(STORAGE_KEY_AUTOS, JSON.stringify(automatizacionesData));
+  localStorage.setItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`, JSON.stringify(automatizacionesData));
   showToast('Automatización guardada con éxito.', 'success');
   cerrarModal('modal-automatizacion');
   cargarDatos();
@@ -901,20 +1156,34 @@ function abrirModalEnviarAhora() {
   abrirModal('modal-enviar-ahora');
 }
 
-function confirmarDisparoEnvio() {
+async function confirmarDisparoEnvio() {
   const autoId = document.getElementById('select-enviar-auto').value;
   const auto = automatizacionesData.find(a => a.id === autoId);
   const nombreTarea = auto ? auto.nombre : 'Envío Manual';
+  const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
 
-  // Registrar en la consola
   const terminal = document.getElementById('terminal-body');
   const nowTime = new Date().toLocaleTimeString();
   terminal.innerHTML += `
-    <div class="log-entry log-info"><span class="log-time">[${nowTime}]</span> <span class="log-msg">Iniciando tarea: '${nombreTarea}'...</span></div>
-    <div class="log-entry log-success"><span class="log-time">[${nowTime}]</span> <span class="log-msg">Destinatarios asignados verificados en cola.</span></div>
+    <div class="log-entry log-info"><span class="log-time">[${nowTime}]</span> <span class="log-msg">[${cfg.nombre}] Disparando tarea: '${nombreTarea}'...</span></div>
   `;
 
-  showToast('¡Proceso de envío disparado!', 'success');
+  try {
+    const res = await fetch(getApiEndpoint('/api/enviar/iniciar'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ auto_id: autoId, nombre_tarea: nombreTarea, empresa: currentEmpresa })
+    });
+    const data = await res.json();
+    if (data.success) {
+      showToast(`¡Envío iniciado para ${cfg.nombre}!`, 'success');
+    } else {
+      showToast(data.error || 'Error al iniciar envío', 'error');
+    }
+  } catch (err) {
+    showToast('No se pudo comunicar con el motor de envíos', 'error');
+  }
+
   cerrarModal('modal-enviar-ahora');
   document.querySelector('[data-tab="tab-consola"]')?.click();
 }
