@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=14">
+  <link rel="stylesheet" href="/style.css?v=15">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -157,27 +157,42 @@
             </div>
           </div>
 
-          <!-- RESUMEN DE TOTALES -->
+          <!-- RESUMEN DE TOTALES Y MÉTRICAS -->
           <div class="kpi-banner">
-            <div class="kpi-item">
-              <span class="kpi-num" id="kpi-total">0</span>
-              <span class="kpi-label">Destinatarios Totales</span>
+            <div class="kpi-item total-kpi">
+              <div class="kpi-icon-badge">👥</div>
+              <div class="kpi-text-box">
+                <span class="kpi-num" id="kpi-total">0</span>
+                <span class="kpi-label">Destinatarios</span>
+              </div>
             </div>
             <div class="kpi-item active-kpi">
-              <span class="kpi-num" id="kpi-activos">0</span>
-              <span class="kpi-label">Activos</span>
+              <div class="kpi-icon-badge">🟢</div>
+              <div class="kpi-text-box">
+                <span class="kpi-num" id="kpi-activos">0</span>
+                <span class="kpi-label">Activos</span>
+              </div>
             </div>
             <div class="kpi-item pending-kpi">
-              <span class="kpi-num" id="kpi-pendientes">0</span>
-              <span class="kpi-label">Pendientes</span>
+              <div class="kpi-icon-badge">⏳</div>
+              <div class="kpi-text-box">
+                <span class="kpi-num" id="kpi-pendientes">0</span>
+                <span class="kpi-label">Pendientes</span>
+              </div>
             </div>
             <div class="kpi-item success-kpi">
-              <span class="kpi-num" id="kpi-enviados">0</span>
-              <span class="kpi-label">Enviados</span>
+              <div class="kpi-icon-badge">✅</div>
+              <div class="kpi-text-box">
+                <span class="kpi-num" id="kpi-enviados">0</span>
+                <span class="kpi-label">Enviados</span>
+              </div>
             </div>
             <div class="kpi-item error-kpi">
-              <span class="kpi-num" id="kpi-errores">0</span>
-              <span class="kpi-label">Incidencias</span>
+              <div class="kpi-icon-badge">⚠️</div>
+              <div class="kpi-text-box">
+                <span class="kpi-num" id="kpi-errores">0</span>
+                <span class="kpi-label">Incidencias</span>
+              </div>
             </div>
           </div>
 
@@ -191,19 +206,18 @@
             <table class="data-table" id="tabla-destinatarios">
               <thead>
                 <tr>
-                  <th style="width: 45px;">#</th>
-                  <th>Destinatario / Grupo</th>
-                  <th style="width: 90px;">Tipo</th>
-                  <th style="width: 80px; text-align: center;">Activo</th>
-                  <th>Reglas Automatizadas Asignadas</th>
-                  <th style="width: 110px;">Estado</th>
-                  <th style="width: 130px;">Fecha Envío</th>
-                  <th style="width: 90px; text-align: center;">Acciones</th>
+                  <th style="width: 48px; text-align: center;">#</th>
+                  <th>Contacto / Empresa</th>
+                  <th style="width: 100px;">Tipo</th>
+                  <th style="width: 110px; text-align: center;">Estado Envíos</th>
+                  <th>Reglas Asignadas</th>
+                  <th style="width: 130px;">Última Notificación</th>
+                  <th style="width: 95px; text-align: center;">Acciones</th>
                 </tr>
               </thead>
               <tbody id="tbody-destinatarios">
                 <tr>
-                  <td colspan="8" class="empty-state-cell">Cargando base de datos...</td>
+                  <td colspan="7" class="empty-state-cell">Cargando base de datos...</td>
                 </tr>
               </tbody>
             </table>
@@ -768,6 +782,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=14"></script>
+  <script src="/app.js?v=15"></script>
 </body>
 </html>

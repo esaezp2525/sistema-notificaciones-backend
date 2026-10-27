@@ -815,19 +815,31 @@ function renderDestinatarios() {
     // 1. Fila para Desktop Table
     tableHtml += `
       <tr>
-        <td style="color: #94a3b8; font-size: 11.5px;">${idx + 1}</td>
-        <td><strong>${escapeHtml(d.nombre)}</strong></td>
+        <td style="text-align: center; color: #94a3b8; font-weight: 600; font-size: 11.5px;">${idx + 1}</td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 32px; height: 32px; border-radius: 8px; background: ${d.tipo === 'Grupo' ? '#e0f2fe' : '#f3e8ff'}; color: ${d.tipo === 'Grupo' ? '#0284c7' : '#7e22ce'}; display: flex; align-items: center; justify-content: center; font-size: 15px; flex-shrink: 0;">
+              ${d.tipo === 'Grupo' ? '🏢' : '👤'}
+            </div>
+            <div>
+              <div style="font-weight: 700; color: #1e293b; font-size: 13.5px;">${escapeHtml(d.nombre)}</div>
+              <div style="font-size: 11px; color: #94a3b8;">WhatsApp Notificaciones</div>
+            </div>
+          </div>
+        </td>
         <td><span class="type-pill ${d.tipo === 'Grupo' ? 'type-group' : 'type-contact'}">${d.tipo}</span></td>
         <td style="text-align: center;">
-          <button type="button" class="btn-toggle-switch ${d.activo ? 'on' : 'off'}" onclick="toggleDestActivo(${d.id})" title="Clic para alternar">
-            ${d.activo ? '✅ Activo' : '⚪ Pausa'}
-          </button>
+          <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+            <button type="button" class="btn-toggle-switch ${d.activo ? 'on' : 'off'}" onclick="toggleDestActivo(${d.id})" title="Clic para alternar">
+              ${d.activo ? '● Activo' : '○ Pausa'}
+            </button>
+            <span class="status-badge ${badgeClass}" style="font-size: 10px; padding: 1px 6px;">${escapeHtml(d.estado)}</span>
+          </div>
         </td>
         <td>${checklistHtml}</td>
-        <td><span class="status-badge ${badgeClass}">${escapeHtml(d.estado)}</span></td>
-        <td style="font-size: 11.5px; color: #64748b;">${d.fecha || '—'}</td>
+        <td style="font-size: 12px; color: #64748b;">${d.fecha ? '📅 ' + d.fecha : '<span style="color:#cbd5e1;">Sin envíos</span>'}</td>
         <td style="text-align: center;">
-          <div style="display: flex; gap: 4px; justify-content: center;">
+          <div style="display: flex; gap: 6px; justify-content: center;">
             <button type="button" class="btn-cell-action btn-edit-dest" onclick="editarDestinatario('${d.id}')" data-id="${d.id}" title="Editar">✏️</button>
             <button type="button" class="btn-cell-action danger btn-delete-dest" onclick="eliminarDestinatario('${d.id}')" data-id="${d.id}" title="Eliminar">🗑️</button>
           </div>
