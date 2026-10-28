@@ -72,7 +72,10 @@ def add_log(level, msg):
         terminal_logs.append(entry)
         if len(terminal_logs) > 500:
             terminal_logs.pop(0)
-    print(f"[{timestamp}] [{level.upper()}] {msg}")
+    try:
+        print(f"[{timestamp}] [{level.upper()}] {msg}")
+    except Exception:
+        pass
 
 # ==================== FERIADOS Y DÍAS HÁBILES ====================
 def es_dia_habil(f):
