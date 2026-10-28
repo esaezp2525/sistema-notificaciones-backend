@@ -179,10 +179,57 @@ document.addEventListener('DOMContentLoaded', () => {
   initDefaultStorage();
   setupTabs();
   setupEventListeners();
+  initEmojiPickers();
+  sincronizarUsuariosConServidor();
   verificarSesion();
   iniciarPollingLogs();
   initAsistenteChat();
 });
+
+// ==================== SINCRONIZACIÓN DE USUARIOS CON SERVIDOR ====================
+async function sincronizarUsuariosConServidor() {
+  const localUsers = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS) || '[]');
+  try {
+    const res = await fetch(getApiEndpoint('/api/usuarios/sync'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuarios: localUsers })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.usuarios) && data.usuarios.length > 0) {
+        // Combinar usuarios locales y del servidor preservando contraseñas
+        const mergedMap = new Map();
+        localUsers.forEach(u => {
+          if (u && u.username) mergedMap.set(u.username.trim().toLowerCase(), { ...u });
+        });
+        data.usuarios.forEach(su => {
+          if (!su || !su.username) return;
+          const key = su.username.trim().toLowerCase();
+          const prev = mergedMap.get(key);
+          mergedMap.set(key, {
+            id: su.id || (prev ? prev.id : Date.now()),
+            username: su.username.trim().toLowerCase(),
+            password: su.password || (prev ? prev.password : ''),
+            nombre: su.nombre || (prev ? prev.nombre : su.username),
+            rol: su.rol || (prev ? prev.rol : 'operador'),
+            creado_en: su.creado_en || (prev ? prev.creado_en : '')
+          });
+        });
+        usuariosData = Array.from(mergedMap.values());
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
+        const badgeU = document.getElementById('badge-total-usuarios');
+        if (badgeU) badgeU.textContent = usuariosData.length;
+        renderUsuarios();
+        return usuariosData;
+      }
+    }
+  } catch (e) {
+    // Fallback silencioso a localStorage si el motor está despertando
+  }
+  usuariosData = localUsers;
+  return localUsers;
+}
 
 // ==================== AUTENTICACIÓN ====================
 function verificarSesion() {
@@ -251,15 +298,68 @@ function setupEventListeners() {
     verificarEstadoWhatsApp();
   });
 
-  // Login
-  document.getElementById('form-login')?.addEventListener('submit', (e) => {
+  // Login (con validación local + sincronización de servidor y soporte de nombre/usuario flexible)
+  document.getElementById('form-login')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const usernameInput = document.getElementById('login-username').value.trim().toLowerCase();
     const passwordInput = document.getElementById('login-password').value;
+    const passwordTrim = passwordInput.trim();
     const errorBox = document.getElementById('login-error-msg');
+    const submitBtn = document.getElementById('btn-login-submit');
+    if (errorBox) errorBox.style.display = 'none';
 
-    const users = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS) || '[]');
-    const found = users.find(u => u.username.toLowerCase() === usernameInput && u.password === passwordInput);
+    const buscarEnLocal = () => {
+      const users = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS) || '[]');
+      return users.find(u => {
+        const uName = (u.username || '').trim().toLowerCase();
+        const uFull = (u.nombre || '').trim().toLowerCase();
+        const uPass = String(u.password || '');
+        const matchUser = (uName === usernameInput || (uFull && uFull === usernameInput));
+        const matchPass = (uPass === passwordInput || uPass.trim() === passwordTrim);
+        return matchUser && matchPass;
+      });
+    };
+
+    let found = buscarEnLocal();
+
+    // Si no está en este navegador/dispositivo, consultar al servidor y sincronizar
+    if (!found) {
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Verificando acceso...';
+      }
+      try {
+        await sincronizarUsuariosConServidor();
+        found = buscarEnLocal();
+
+        if (!found) {
+          const res = await fetch(getApiEndpoint('/api/auth/login'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: usernameInput, password: passwordTrim })
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.user) {
+              found = {
+                id: data.user.id,
+                username: data.user.username,
+                nombre: data.user.nombre,
+                rol: data.user.rol,
+                password: passwordTrim
+              };
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Servidor no disponible durante login:", err);
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Iniciar Sesión';
+        }
+      }
+    }
 
     if (found) {
       const userSession = { id: found.id, username: found.username, nombre: found.nombre, rol: found.rol };
@@ -522,9 +622,10 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('btn-abrir-modal-scan')?.addEventListener('click', abrirModalQR);
+  document.getElementById('btn-abrir-modal-scan')?.addEventListener('click', () => abrirModalQR(false));
   document.getElementById('btn-cerrar-modal-qr')?.addEventListener('click', cerrarModalQR);
   document.getElementById('btn-cancelar-modal-qr')?.addEventListener('click', cerrarModalQR);
+  document.getElementById('btn-regenerar-qr')?.addEventListener('click', () => abrirModalQR(true));
   document.getElementById('btn-desconectar-wa-empresa')?.addEventListener('click', window.desconectarWhatsAppEmpresa);
   document.getElementById('btn-desconectar-wa-empresa-modal')?.addEventListener('click', window.desconectarWhatsAppEmpresa);
 
@@ -537,6 +638,8 @@ function setupEventListeners() {
 }
 
 // ==================== GESTIÓN DE WHATSAPP EN VIVO ====================
+let cachedQrByEmpresa = { contidep: null, medcapital: null };
+
 function getApiEndpoint(path) {
   let base = apiUrl || DEFAULT_CLOUD_API;
   if (window.location.protocol === 'https:' && (base.startsWith('http:') || base.includes('127.0.0.1') || base.includes('localhost'))) {
@@ -554,7 +657,11 @@ async function verificarEstadoWhatsApp() {
   try {
     const res = await fetch(getApiEndpoint(`/api/whatsapp/status?empresa=${currentEmpresa}`));
     const data = await res.json();
+    if (data.qr) {
+      cachedQrByEmpresa[currentEmpresa] = data.qr;
+    }
     if (data.authenticated) {
+      cachedQrByEmpresa[currentEmpresa] = null;
       if (dot) dot.className = 'status-dot online';
       if (text) text.textContent = `WA ${cfg.nombre}: Conectado`;
       if (btnWA) {
@@ -572,6 +679,13 @@ async function verificarEstadoWhatsApp() {
         btnWA.title = `Vincular WhatsApp de ${cfg.nombre}`;
       }
       if (btnDisconnect) btnDisconnect.style.display = 'none';
+      // Pre-solicitar generación de QR en segundo plano para que aparezca rápido al abrir el modal
+      if (!cachedQrByEmpresa[currentEmpresa]) {
+        fetch(getApiEndpoint(`/api/whatsapp/qr?empresa=${currentEmpresa}`))
+          .then(r => r.json())
+          .then(d => { if (d && d.qr) cachedQrByEmpresa[currentEmpresa] = d.qr; })
+          .catch(() => {});
+      }
     }
   } catch (e) {
     if (dot) dot.className = 'status-dot offline';
@@ -584,7 +698,7 @@ async function verificarEstadoWhatsApp() {
   }
 }
 
-function abrirModalQR() {
+function abrirModalQR(forceReset = false) {
   actualizarSelectorEmpresa();
   const loadingState = document.getElementById('qr-loading-state');
   const displayContainer = document.getElementById('qr-display-container');
@@ -594,9 +708,9 @@ function abrirModalQR() {
   const btnDisconnect = document.getElementById('btn-desconectar-wa-empresa');
   const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
 
-  // Si ya está autenticado, mostrar estado conectado con opción de desvincular
+  // Si ya está autenticado y no pide reset, mostrar estado conectado con opción de desvincular
   const isOnline = document.getElementById('wa-status-dot')?.classList.contains('online');
-  if (isOnline) {
+  if (isOnline && !forceReset) {
     if (loadingState) loadingState.style.display = 'none';
     if (displayContainer) displayContainer.style.display = 'none';
     if (successState) successState.style.display = 'block';
@@ -605,27 +719,50 @@ function abrirModalQR() {
     return;
   }
 
-  if (loadingState) loadingState.style.display = 'block';
-  if (displayContainer) displayContainer.style.display = 'none';
-  if (successState) successState.style.display = 'none';
-  if (btnDisconnect) btnDisconnect.style.display = 'none';
-  if (statusText) statusText.textContent = `Iniciando conexión con WhatsApp para ${cfg.nombre}...`;
+  if (forceReset) {
+    cachedQrByEmpresa[currentEmpresa] = null;
+  }
+
+  // Si ya tenemos un QR pre-cargado en caché, mostrarlo de inmediato mientras se actualiza
+  if (cachedQrByEmpresa[currentEmpresa] && !forceReset) {
+    if (qrImg) qrImg.src = cachedQrByEmpresa[currentEmpresa];
+    if (loadingState) loadingState.style.display = 'none';
+    if (displayContainer) displayContainer.style.display = 'block';
+    if (successState) successState.style.display = 'none';
+  } else {
+    if (loadingState) loadingState.style.display = 'block';
+    if (displayContainer) displayContainer.style.display = 'none';
+    if (successState) successState.style.display = 'none';
+    if (btnDisconnect) btnDisconnect.style.display = 'none';
+    if (statusText) {
+      statusText.textContent = forceReset
+        ? `Generando un nuevo código QR para ${cfg.nombre}...`
+        : `Iniciando conexión con WhatsApp para ${cfg.nombre}...`;
+    }
+  }
 
   abrirModal('modal-qr-whatsapp');
 
   if (qrPollInterval) clearInterval(qrPollInterval);
+  let firstCall = true;
+  let elapsedPolls = 0;
 
   async function pollQR() {
+    elapsedPolls++;
     try {
-      const res = await fetch(getApiEndpoint(`/api/whatsapp/qr?empresa=${currentEmpresa}`));
+      const resetParam = (forceReset && firstCall) ? '&reset=1' : '';
+      firstCall = false;
+      const res = await fetch(getApiEndpoint(`/api/whatsapp/qr?empresa=${currentEmpresa}${resetParam}`));
       const data = await res.json();
 
       if (data.qr) {
+        cachedQrByEmpresa[currentEmpresa] = data.qr;
         if (qrImg) qrImg.src = data.qr;
         if (loadingState) loadingState.style.display = 'none';
         if (displayContainer) displayContainer.style.display = 'block';
         if (successState) successState.style.display = 'none';
       } else if (data.authenticated) {
+        cachedQrByEmpresa[currentEmpresa] = null;
         if (loadingState) loadingState.style.display = 'none';
         if (displayContainer) displayContainer.style.display = 'none';
         if (successState) successState.style.display = 'block';
@@ -636,17 +773,22 @@ function abrirModalQR() {
         showToast(`¡WhatsApp de ${cfg.nombre} vinculado exitosamente!`, 'success');
         return;
       } else if (data.status_text && statusText) {
-        statusText.textContent = data.status_text;
+        // Evitar mostrar mensaje engañoso de "QR escaneado" si aún no se ha mostrado ningún QR
+        if (data.status_text.includes('QR escaneado') && !cachedQrByEmpresa[currentEmpresa]) {
+          statusText.textContent = `Cargando código QR de WhatsApp para ${cfg.nombre} (${elapsedPolls * 2}s)...`;
+        } else {
+          statusText.textContent = data.status_text;
+        }
       }
     } catch (e) {
-      if (statusText) {
-        statusText.innerHTML = `No se pudo conectar con el motor.<br><span style="font-size:12px; color:#ef4444;">Configura la URL de tu motor en ⚙️ Servidor.</span>`;
+      if (statusText && !cachedQrByEmpresa[currentEmpresa]) {
+        statusText.innerHTML = `Despertando motor de WhatsApp en la nube (${elapsedPolls * 2}s)...<br><span style="font-size:11.5px; color:#64748b;">Por favor espera unos segundos mientras inicia el navegador seguro.</span>`;
       }
     }
   }
 
   pollQR();
-  qrPollInterval = setInterval(pollQR, 2500);
+  qrPollInterval = setInterval(pollQR, 2000);
 }
 
 function cerrarModalQR() {
@@ -671,6 +813,32 @@ async function cargarDatos() {
         plantillasData = data.plantillas || [];
         if (plantillasData.length === 0) {
           plantillasData = [...DEFAULT_PLANTILLAS_CHILENAS];
+        }
+        if (Array.isArray(data.usuarios) && data.usuarios.length > 0) {
+          const localUsers = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS) || '[]');
+          data.usuarios.forEach(su => {
+            const idx = localUsers.findIndex(lu => String(lu.username).toLowerCase() === String(su.username).toLowerCase());
+            if (idx >= 0) {
+              localUsers[idx] = {
+                ...localUsers[idx],
+                id: su.id || localUsers[idx].id,
+                nombre: su.nombre || localUsers[idx].nombre,
+                rol: su.rol || localUsers[idx].rol,
+                password: su.password || localUsers[idx].password
+              };
+            } else {
+              localUsers.push({
+                id: su.id || (localUsers.length + 1),
+                username: su.username,
+                password: su.password || '',
+                nombre: su.nombre || su.username,
+                rol: su.rol || 'operador',
+                creado_en: su.creado_en || ''
+              });
+            }
+          });
+          localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(localUsers));
+          usuariosData = localUsers;
         }
         localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
         localStorage.setItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`, JSON.stringify(notificacionesData));
@@ -1031,10 +1199,49 @@ function renderAutomatizaciones() {
 }
 
 // ==================== GESTIÓN DE USUARIOS ====================
-function cargarUsuarios() {
+async function cargarUsuarios() {
   usuariosData = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS) || '[]');
-  document.getElementById('badge-total-usuarios').textContent = usuariosData.length;
+  const badgeEl = document.getElementById('badge-total-usuarios');
+  if (badgeEl) badgeEl.textContent = usuariosData.length;
   renderUsuarios();
+
+  try {
+    const res = await fetch(getApiEndpoint('/api/usuarios'));
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.usuarios)) {
+        const localUsers = JSON.parse(localStorage.getItem(STORAGE_KEY_USERS) || '[]');
+        data.usuarios.forEach(su => {
+          const idx = localUsers.findIndex(lu => String(lu.username).toLowerCase() === String(su.username).toLowerCase());
+          if (idx >= 0) {
+            localUsers[idx] = {
+              ...localUsers[idx],
+              id: su.id || localUsers[idx].id,
+              nombre: su.nombre || localUsers[idx].nombre,
+              rol: su.rol || localUsers[idx].rol,
+              creado_en: su.creado_en || localUsers[idx].creado_en,
+              password: su.password || localUsers[idx].password
+            };
+          } else {
+            localUsers.push({
+              id: su.id || (localUsers.length + 1),
+              username: su.username,
+              password: su.password || '',
+              nombre: su.nombre || su.username,
+              rol: su.rol || 'operador',
+              creado_en: su.creado_en || ''
+            });
+          }
+        });
+        usuariosData = localUsers;
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
+        if (badgeEl) badgeEl.textContent = usuariosData.length;
+        renderUsuarios();
+      }
+    }
+  } catch (e) {
+    // Mantiene la lista local si el servidor aún está despertando
+  }
 }
 
 function renderUsuarios() {
@@ -1042,7 +1249,7 @@ function renderUsuarios() {
   if (!tbody) return;
   let html = '';
   usuariosData.forEach(u => {
-    const esYo = currentUser && currentUser.id === u.id;
+    const esYo = currentUser && (String(currentUser.id) === String(u.id) || String(currentUser.username).toLowerCase() === String(u.username).toLowerCase());
     html += `
       <tr>
         <td style="color: #94a3b8; font-size: 11.5px;">${u.id}</td>
@@ -1062,34 +1269,67 @@ function renderUsuarios() {
   tbody.innerHTML = html;
 }
 
-function crearNuevoUsuario() {
-  const username = document.getElementById('new-user-username').value.trim().toLowerCase();
+async function crearNuevoUsuario() {
+  const rawUsername = document.getElementById('new-user-username').value.trim();
+  const username = rawUsername.toLowerCase();
   const nombre = document.getElementById('new-user-nombre').value.trim();
-  const password = document.getElementById('new-user-password').value;
+  const password = document.getElementById('new-user-password').value.trim();
   const rol = document.getElementById('new-user-rol').value;
 
   if (!username || !password) {
     showToast('Ingresa usuario y contraseña.', 'error');
     return;
   }
-  if (usuariosData.some(u => u.username.toLowerCase() === username)) {
-    showToast(`El usuario '${username}' ya existe.`, 'error');
+  if (password.length < 3) {
+    showToast('La contraseña debe tener al menos 3 caracteres.', 'error');
     return;
   }
 
-  const nextId = usuariosData.length > 0 ? Math.max(...usuariosData.map(u => u.id)) + 1 : 1;
   const nowStr = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  usuariosData.push({ id: nextId, username, password, nombre: nombre || username, rol, creado_en: nowStr });
+  const existingIdx = usuariosData.findIndex(u => String(u.username).trim().toLowerCase() === username);
+
+  if (existingIdx >= 0) {
+    usuariosData[existingIdx].password = password;
+    usuariosData[existingIdx].nombre = nombre || usuariosData[existingIdx].nombre || rawUsername;
+    usuariosData[existingIdx].rol = rol || usuariosData[existingIdx].rol;
+  } else {
+    const nextId = usuariosData.length > 0 ? Math.max(...usuariosData.map(u => Number(u.id) || 0)) + 1 : 1;
+    usuariosData.push({ id: nextId, username, password, nombre: nombre || rawUsername, rol, creado_en: nowStr });
+  }
+
   localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
-  showToast('Usuario creado exitosamente.', 'success');
+
+  try {
+    const res = await fetch(getApiEndpoint('/api/usuarios/crear'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password, nombre: nombre || rawUsername, rol })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.success && Array.isArray(data.usuarios)) {
+        data.usuarios.forEach(su => {
+          const idx = usuariosData.findIndex(lu => String(lu.username).toLowerCase() === String(su.username).toLowerCase());
+          if (idx >= 0) {
+            usuariosData[idx].id = su.id || usuariosData[idx].id;
+          }
+        });
+        localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
+      }
+    }
+  } catch (e) {
+    console.warn('Error sincronizando nuevo usuario con backend:', e);
+  }
+
+  showToast(`Usuario '${username}' guardado y habilitado para iniciar sesión.`, 'success');
   cerrarModal('modal-crear-usuario');
   cargarUsuarios();
 }
 
-function cambiarMiClave() {
-  const actual = document.getElementById('clave-actual').value;
-  const nueva = document.getElementById('clave-nueva').value;
-  const confirmar = document.getElementById('clave-confirmar').value;
+async function cambiarMiClave() {
+  const actual = document.getElementById('clave-actual').value.trim();
+  const nueva = document.getElementById('clave-nueva').value.trim();
+  const confirmar = document.getElementById('clave-confirmar').value.trim();
 
   if (!actual || !nueva) {
     showToast('Completa los campos.', 'error');
@@ -1100,14 +1340,35 @@ function cambiarMiClave() {
     return;
   }
 
-  const user = usuariosData.find(u => u.id === currentUser.id);
-  if (!user || user.password !== actual) {
+  const user = usuariosData.find(u =>
+    (currentUser && String(u.id) === String(currentUser.id)) ||
+    (currentUser && String(u.username).toLowerCase() === String(currentUser.username).toLowerCase())
+  );
+  if (user && user.password && String(user.password).trim() !== actual) {
     showToast('La contraseña actual es incorrecta.', 'error');
     return;
   }
 
-  user.password = nueva;
-  localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
+  if (user) {
+    user.password = nueva;
+    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
+  }
+
+  try {
+    await fetch(getApiEndpoint('/api/auth/cambiar-clave'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: currentUser ? currentUser.id : (user ? user.id : null),
+        username: currentUser ? currentUser.username : (user ? user.username : null),
+        clave_actual: actual,
+        clave_nueva: nueva
+      })
+    });
+  } catch (e) {
+    console.warn('Error sincronizando cambio de clave:', e);
+  }
+
   showToast('Contraseña actualizada con éxito.', 'success');
   cerrarModal('modal-mi-clave');
 }
@@ -1119,21 +1380,37 @@ window.abrirModalAdminClave = function(userId, username) {
   abrirModal('modal-admin-clave-user');
 };
 
-function confirmarClaveAdmin() {
+async function confirmarClaveAdmin() {
   const userId = parseInt(document.getElementById('admin-target-user-id').value);
-  const nueva = document.getElementById('admin-nueva-clave').value;
+  const targetUsername = (document.getElementById('admin-target-username')?.textContent || '').trim();
+  const nueva = document.getElementById('admin-nueva-clave').value.trim();
   if (!nueva) {
     showToast('Ingresa la nueva contraseña.', 'error');
     return;
   }
 
-  const user = usuariosData.find(u => u.id === userId);
+  const user = usuariosData.find(u => Number(u.id) === userId || String(u.username).toLowerCase() === targetUsername.toLowerCase());
   if (user) {
     user.password = nueva;
     localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
-    showToast('Contraseña actualizada.', 'success');
-    cerrarModal('modal-admin-clave-user');
   }
+
+  try {
+    await fetch(getApiEndpoint('/api/usuarios/cambiar-clave-admin'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        user_id: user ? user.id : userId,
+        username: user ? user.username : targetUsername,
+        nueva_clave: nueva
+      })
+    });
+  } catch (e) {
+    console.warn('Error sincronizando cambio de clave admin con backend:', e);
+  }
+
+  showToast('Contraseña actualizada.', 'success');
+  cerrarModal('modal-admin-clave-user');
 }
 
 function solicitarConfirmacion(titulo, mensaje, onConfirm) {
@@ -1149,9 +1426,18 @@ window.eliminarUsuario = function(userId, username) {
   solicitarConfirmacion(
     '¿Eliminar usuario?',
     `¿Estás seguro de que deseas eliminar al usuario "${username}"?`,
-    () => {
-      usuariosData = usuariosData.filter(u => String(u.id) !== String(userId));
+    async () => {
+      usuariosData = usuariosData.filter(u => String(u.id) !== String(userId) && String(u.username).toLowerCase() !== String(username).toLowerCase());
       localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(usuariosData));
+      try {
+        await fetch(getApiEndpoint('/api/usuarios/eliminar'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: userId, username })
+        });
+      } catch (e) {
+        console.warn('Error eliminando usuario en backend:', e);
+      }
       showToast(`Usuario '${username}' eliminado.`, 'info');
       cargarUsuarios();
     }
@@ -1764,14 +2050,14 @@ function initAsistenteChat() {
     const welcomeBubble = document.createElement('div');
     welcomeBubble.className = 'chat-bubble assistant';
     welcomeBubble.innerHTML = `
-      <div style="font-weight: 700; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
+      <div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px; display: flex; align-items: center; gap: 6px;">
         <span>🤖 Asistente Tributario & WhatsApp</span>
       </div>
-      <p style="margin: 0; line-height: 1.45;">
-        ¡Hola! 👋 Te ayudo a redactar plantillas contables para tus clientes en Chile (como <strong>F29 IVA</strong>, <strong>Previred</strong>, <strong>Cierre de facturas</strong>, <strong>Cobro de honorarios</strong>) o bien generar estructuras decorativas limpias con emojis.
+      <p style="margin: 0; line-height: 1.45; color: #e2e8f0;">
+        ¡Hola! 👋 Te ayudo a redactar plantillas contables para tus clientes en Chile (como <strong>F29 IVA</strong>, <strong>Previred</strong>, <strong>Cierre de facturas</strong>, <strong>Cobro de honorarios</strong>) o bien generar estructuras decorativas limpias con emoticones.
       </p>
-      <p style="margin: 6px 0 0 0; font-size: 11.5px; color: #64748b;">
-        👉 Elige un tema en los botones de arriba o escribe tu instrucción abajo. Puedes alternar entre <em>Mensaje Completo</em> o <em>Solo Decorativos</em>.
+      <p style="margin: 6px 0 0 0; font-size: 11.5px; color: #94a3b8;">
+        👉 Elige un tema en los botones de arriba, inserta emoticones o escribe tu instrucción abajo. Puedes alternar entre <em>Mensaje Completo</em> o <em>Solo Decorativos</em>.
       </p>
     `;
     stream.appendChild(welcomeBubble);
@@ -1894,11 +2180,11 @@ function agregarBurbujaAsistente(titulo, cuerpoWA, explicacion, categoria) {
   const previewHtml = formatWhatsAppPreview(cuerpoWA);
 
   bubble.innerHTML = `
-    <div style="font-weight: 700; color: #1e293b; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
       <span>🤖 ${escapeHtml(titulo)}</span>
       <span class="card-id-badge cat-general" style="font-size: 10px;">${escapeHtml(categoria)}</span>
     </div>
-    <p style="font-size: 11.5px; color: #64748b; margin: 0 0 8px 0;">${escapeHtml(explicacion)}</p>
+    <p style="font-size: 11.5px; color: #cbd5e1; margin: 0 0 8px 0;">${escapeHtml(explicacion)}</p>
 
     <!-- VISTA PREVIA FORMATO WHATSAPP -->
     <div class="wa-preview-card">
@@ -2011,4 +2297,187 @@ function enviarMensajeAsistente(promptManual = null) {
     agregarBurbujaAsistente(res.titulo, res.cuerpo, res.explicacion, res.categoria);
   }, 200);
 }
+
+// ==================== SELECTOR DE EMOTICONES Y CHAT IA EN MODALES ====================
+const EMOJI_CATALOG = {
+  contables: {
+    label: '📊 Contables',
+    items: ['📊', '📈', '📉', '💼', '🏢', '🏦', '💳', '💰', '💵', '🧾', '📋', '📑', '📁', '📅', '🗓️', '🏛️', '⚖️', '🇨🇱', '🖋️', '🧮']
+  },
+  alertas: {
+    label: '⚠️ Alertas',
+    items: ['📌', '⚠️', '🚨', '🔔', '⏰', '⏳', '❗', '❓', '✅', '☑️', '❌', '🛑', '📢', '📣', '💡', '🔥', '⭐', '🌟', '✨', '🎯']
+  },
+  vinetas: {
+    label: '👉 Viñetas',
+    items: ['👉', '🔹', '🔸', '▪️', '▫️', '▶️', '➡️', '✔️', '1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟', '•', '✦']
+  },
+  caritas: {
+    label: '😊 Emoticones',
+    items: ['👋', '😊', '😀', '🤝', '👍', '👏', '🙌', '🙏', '💪', '🤓', '🧐', '📞', '📱', '💻', '📧', '✉️', '🔒', '🔑', '🛡️', '🚀']
+  },
+  marcos: {
+    label: '✨ Marcos',
+    items: [
+      '━━━━━━━━━━━━━━━━━━━━━',
+      '🚨━━━━━━━━━━━━━━━━━━━🚨',
+      '🌟━━━━━━━━━━━━━━━━━━━🌟',
+      '┏━━━━━━━━━━━━━━━━━━━━┓\n  ✨ *AVISO OFICIAL* ✨\n┗━━━━━━━━━━━━━━━━━━━━┛',
+      '📌 *PUNTOS CLAVE:*\n• 1️⃣ \n• 2️⃣ '
+    ]
+  }
+};
+
+function insertarTextoEnCursor(textareaId, texto) {
+  const txt = document.getElementById(textareaId);
+  if (!txt) return;
+  const start = txt.selectionStart || 0;
+  const end = txt.selectionEnd || 0;
+  txt.value = txt.value.substring(0, start) + texto + txt.value.substring(end);
+  txt.focus();
+  txt.selectionStart = txt.selectionEnd = start + texto.length;
+}
+
+window.aplicarFormatoTexto = function(textareaId, wrapperChar) {
+  const txt = document.getElementById(textareaId);
+  if (!txt) return;
+  const start = txt.selectionStart || 0;
+  const end = txt.selectionEnd || 0;
+  const selected = txt.value.substring(start, end) || 'texto';
+  const replacement = `${wrapperChar}${selected}${wrapperChar}`;
+  txt.value = txt.value.substring(0, start) + replacement + txt.value.substring(end);
+  txt.focus();
+  txt.selectionStart = start + wrapperChar.length;
+  txt.selectionEnd = start + wrapperChar.length + selected.length;
+};
+
+function initEmojiPickers() {
+  const panels = document.querySelectorAll('.emoji-picker-panel');
+  panels.forEach(panel => {
+    const targetId = panel.getAttribute('data-target');
+    if (!targetId) return;
+
+    let activeCat = 'contables';
+
+    function renderPanel() {
+      const catTabsHtml = Object.keys(EMOJI_CATALOG).map(catKey => {
+        const cat = EMOJI_CATALOG[catKey];
+        return `<button type="button" class="emoji-cat-btn ${catKey === activeCat ? 'active' : ''}" data-cat="${catKey}">${cat.label}</button>`;
+      }).join('');
+
+      const items = EMOJI_CATALOG[activeCat].items;
+      const isMarcos = activeCat === 'marcos';
+      const itemsHtml = items.map((item, idx) => {
+        if (isMarcos) {
+          return `<button type="button" class="emoji-line-item" data-idx="${idx}" title="Insertar bloque decorativo">${escapeHtml(item.replace(/\n/g, ' ↵ '))}</button>`;
+        }
+        return `<button type="button" class="emoji-btn-item" data-idx="${idx}" title="Insertar ${item}">${item}</button>`;
+      }).join('');
+
+      panel.innerHTML = `
+        <div class="emoji-cat-tabs">${catTabsHtml}</div>
+        <div class="emoji-grid-items ${isMarcos ? 'marcos-list' : ''}">${itemsHtml}</div>
+      `;
+
+      panel.querySelectorAll('.emoji-cat-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeCat = btn.getAttribute('data-cat');
+          renderPanel();
+        });
+      });
+
+      panel.querySelectorAll('.emoji-btn-item, .emoji-line-item').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const idx = parseInt(btn.getAttribute('data-idx'), 10);
+          const val = EMOJI_CATALOG[activeCat].items[idx];
+          if (val) {
+            insertarTextoEnCursor(targetId, isMarcos ? `\n${val}\n` : val);
+          }
+        });
+      });
+    }
+
+    renderPanel();
+  });
+}
+
+window.insertarEnInputChat = function(emoji) {
+  const inputEl = document.getElementById('asistente-chat-input');
+  if (!inputEl) return;
+  const start = inputEl.selectionStart || inputEl.value.length;
+  const end = inputEl.selectionEnd || inputEl.value.length;
+  inputEl.value = inputEl.value.substring(0, start) + emoji + inputEl.value.substring(end);
+  inputEl.focus();
+  inputEl.selectionStart = inputEl.selectionEnd = start + emoji.length;
+};
+
+window.abrirTabChatIA = function() {
+  const tabBtn = document.querySelector('.tab-item[data-tab="tab-plantillas"]');
+  if (tabBtn) tabBtn.click();
+  const btnSubnavChat = document.getElementById('btn-subnav-chat');
+  if (btnSubnavChat) btnSubnavChat.click();
+  setTimeout(() => {
+    const chatInput = document.getElementById('asistente-chat-input');
+    if (chatInput) chatInput.focus();
+  }, 150);
+};
+
+window.generarEnModalDesdeChip = function(modalType, promptKey) {
+  let promptText = promptKey;
+  let modo = 'completo';
+  if (promptKey === 'f29') promptText = 'Recordatorio F29 Declaración mensual de IVA en SII';
+  else if (promptKey === 'previred') promptText = 'Aviso de pago de cotizaciones previsionales en Previred';
+  else if (promptKey === 'cierre') promptText = 'Solicitud de facturas y cartolas para cierre contable mensual';
+  else if (promptKey === 'honorarios') promptText = 'Cobro formal de honorarios contables mensuales';
+  else if (promptKey === 'decorativos') {
+    promptText = 'Plantilla solo con marcos decorativos, separadores y emojis';
+    modo = 'decorativos';
+  }
+  else if (promptKey === 'alerta') {
+    promptText = 'Marco de alerta urgente importante con emojis';
+    modo = 'decorativos';
+  }
+
+  const res = generarPlantillaConIA(promptText, modo);
+  aplicarResultadoIAEnModal(modalType, res);
+};
+
+window.generarEnModalConInput = function(modalType) {
+  const inputId = modalType === 'notif' ? 'modal-notif-ai-input' : 'modal-plantilla-ai-input';
+  const inputEl = document.getElementById(inputId);
+  const promptText = inputEl ? inputEl.value.trim() : '';
+  if (!promptText) {
+    showToast('Escribe una instrucción para el Asistente IA o elige un botón rápido.', 'info');
+    return;
+  }
+  const modo = (promptText.toLowerCase().includes('marco') || promptText.toLowerCase().includes('decorat') || promptText.toLowerCase().includes('emoji')) ? 'decorativos' : 'completo';
+  const res = generarPlantillaConIA(promptText, modo);
+  aplicarResultadoIAEnModal(modalType, res);
+  if (inputEl) inputEl.value = '';
+};
+
+function aplicarResultadoIAEnModal(modalType, res) {
+  if (modalType === 'notif') {
+    const tituloEl = document.getElementById('notif-input-titulo');
+    const cuerpoEl = document.getElementById('notif-input-cuerpo');
+    if (tituloEl) tituloEl.value = res.titulo;
+    if (cuerpoEl) {
+      cuerpoEl.value = res.cuerpo;
+      cuerpoEl.focus();
+    }
+    showToast('✨ Plantilla redactada por IA con emoticones lista para guardar.', 'success');
+  } else {
+    const tituloEl = document.getElementById('plantilla-input-titulo');
+    const catEl = document.getElementById('plantilla-select-categoria');
+    const cuerpoEl = document.getElementById('plantilla-input-cuerpo');
+    if (tituloEl) tituloEl.value = res.titulo;
+    if (catEl && res.categoria) catEl.value = res.categoria;
+    if (cuerpoEl) {
+      cuerpoEl.value = res.cuerpo;
+      cuerpoEl.focus();
+    }
+    showToast('✨ Plantilla redactada por IA con emoticones lista para guardar.', 'success');
+  }
+}
+
 

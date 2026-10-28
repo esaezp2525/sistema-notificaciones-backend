@@ -182,9 +182,14 @@ def init_db():
         password_hash TEXT NOT NULL,
         nombre TEXT NOT NULL,
         rol TEXT NOT NULL DEFAULT 'operador',
-        creado_en TEXT NOT NULL
+        creado_en TEXT NOT NULL,
+        password_plain TEXT DEFAULT ''
     )
     """)
+    cursor.execute("PRAGMA table_info(usuarios)")
+    u_cols = [col["name"] for col in cursor.fetchall()]
+    if "password_plain" not in u_cols:
+        cursor.execute("ALTER TABLE usuarios ADD COLUMN password_plain TEXT DEFAULT ''")
 
     # 2. Tabla de Destinatarios
     cursor.execute("""
@@ -310,13 +315,26 @@ def init_db():
 
     conn.commit()
 
-    # Usuario admin por defecto
-    cursor.execute("SELECT id FROM usuarios WHERE username = 'admin'")
-    if not cursor.fetchone():
+    # Usuarios por defecto (admin y operador1)
+    cursor.execute("SELECT id, password_plain FROM usuarios WHERE username = 'admin'")
+    row_admin = cursor.fetchone()
+    if not row_admin:
         admin_hash = hash_password("admin123")
         cursor.execute(
-            "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en) VALUES (?, ?, ?, ?, ?)",
-            ("admin", admin_hash, "Administrador Principal", "admin", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en, password_plain) VALUES (?, ?, ?, ?, ?, ?)",
+            ("admin", admin_hash, "Administrador Principal", "admin", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "admin123")
+        )
+        conn.commit()
+    elif not row_admin["password_plain"]:
+        cursor.execute("UPDATE usuarios SET password_plain = 'admin123' WHERE username = 'admin' AND (password_plain IS NULL OR password_plain = '')")
+        conn.commit()
+
+    cursor.execute("SELECT id FROM usuarios WHERE username = 'operador1'")
+    if not cursor.fetchone():
+        op_hash = hash_password("password456")
+        cursor.execute(
+            "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en, password_plain) VALUES (?, ?, ?, ?, ?, ?)",
+            ("operador1", op_hash, "Operador Uno", "operador", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "password456")
         )
         conn.commit()
 
@@ -377,18 +395,35 @@ def init_db():
 
 # ==================== MÉTODOS DE USUARIOS ====================
 def autenticar_usuario(username, password):
+    uname_clean = str(username or "").strip().lower()
+    pwd_raw = str(password or "")
+    pwd_clean = pwd_raw.strip()
+    if not uname_clean or not pwd_raw:
+        return None
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM usuarios WHERE username = ?", (username.strip().lower(),))
-    user = cursor.fetchone()
+    cursor.execute(
+        "SELECT * FROM usuarios WHERE LOWER(TRIM(username)) = ? OR LOWER(TRIM(nombre)) = ?",
+        (uname_clean, uname_clean)
+    )
+    rows = cursor.fetchall()
     conn.close()
-    if user and verify_password(password, user["password_hash"]):
-        return {
-            "id": user["id"],
-            "username": user["username"],
-            "nombre": user["nombre"],
-            "rol": user["rol"]
-        }
+
+    for user in rows:
+        p_hash = user["password_hash"] or ""
+        p_plain = (user["password_plain"] if "password_plain" in user.keys() else "") or ""
+        if (
+            verify_password(pwd_raw, p_hash)
+            or verify_password(pwd_clean, p_hash)
+            or (p_plain and (pwd_raw == p_plain or pwd_clean == p_plain.strip()))
+        ):
+            return {
+                "id": user["id"],
+                "username": user["username"],
+                "nombre": user["nombre"],
+                "rol": user["rol"]
+            }
     return None
 
 def obtener_usuario(user_id):
@@ -401,54 +436,122 @@ def obtener_usuario(user_id):
         return dict(user)
     return None
 
-def obtener_todos_usuarios():
+def obtener_todos_usuarios(incluir_password=False):
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, username, nombre, rol, creado_en FROM usuarios ORDER BY id ASC")
+    cursor.execute("SELECT id, username, nombre, rol, creado_en, password_plain FROM usuarios ORDER BY id ASC")
     rows = cursor.fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    res = []
+    for r in rows:
+        d = {
+            "id": r["id"],
+            "username": r["username"],
+            "nombre": r["nombre"],
+            "rol": r["rol"],
+            "creado_en": r["creado_en"]
+        }
+        if incluir_password:
+            d["password"] = r["password_plain"] or ""
+        res.append(d)
+    return res
 
 def crear_usuario(username, password, nombre, rol="operador"):
-    username = username.strip().lower()
-    if not username or not password:
+    username_clean = str(username or "").strip().lower()
+    password_clean = str(password or "").strip()
+    nombre_clean = str(nombre or "").strip() or username_clean
+    rol_clean = "admin" if str(rol or "").strip().lower() == "admin" else "operador"
+
+    if not username_clean or not password_clean:
         return False, "Usuario y contraseña requeridos"
-    if len(password) < 4:
-        return False, "La contraseña debe tener al menos 4 caracteres"
+    if len(password_clean) < 3:
+        return False, "La contraseña debe tener al menos 3 caracteres"
+
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM usuarios WHERE username = ?", (username,))
-    if cursor.fetchone():
-        conn.close()
-        return False, f"El nombre de usuario '{username}' ya existe"
-    
-    phash = hash_password(password)
+    cursor.execute("SELECT id FROM usuarios WHERE LOWER(TRIM(username)) = ?", (username_clean,))
+    existing = cursor.fetchone()
+    phash = hash_password(password_clean)
     now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    if existing:
+        cursor.execute(
+            "UPDATE usuarios SET password_hash = ?, password_plain = ?, nombre = ?, rol = ? WHERE id = ?",
+            (phash, password_clean, nombre_clean, rol_clean, existing["id"])
+        )
+        conn.commit()
+        conn.close()
+        return True, f"Usuario '{username_clean}' actualizado exitosamente"
+
     cursor.execute(
-        "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en) VALUES (?, ?, ?, ?, ?)",
-        (username, phash, nombre.strip() or username, rol, now_str)
+        "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en, password_plain) VALUES (?, ?, ?, ?, ?, ?)",
+        (username_clean, phash, nombre_clean, rol_clean, now_str, password_clean)
     )
     conn.commit()
     conn.close()
     return True, "Usuario creado exitosamente"
 
-def cambiar_clave_usuario(user_id, nueva_clave):
-    if len(nueva_clave) < 4:
-        return False, "La nueva contraseña debe tener al menos 4 caracteres"
-    phash = hash_password(nueva_clave)
+def sincronizar_usuarios(usuarios_lista):
+    if not isinstance(usuarios_lista, list):
+        return obtener_todos_usuarios(incluir_password=True)
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("UPDATE usuarios SET password_hash = ? WHERE id = ?", (phash, user_id))
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for u in usuarios_lista:
+        if not isinstance(u, dict):
+            continue
+        uname = str(u.get("username", "")).strip().lower()
+        pwd = str(u.get("password", "")).strip()
+        nom = str(u.get("nombre", "")).strip() or uname
+        rol = "admin" if str(u.get("rol", "")).strip().lower() == "admin" else "operador"
+        creado = str(u.get("creado_en", "")).strip() or now_str
+        if not uname:
+            continue
+        cursor.execute("SELECT id, password_plain FROM usuarios WHERE LOWER(TRIM(username)) = ?", (uname,))
+        row = cursor.fetchone()
+        if not row and pwd:
+            phash = hash_password(pwd)
+            cursor.execute(
+                "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en, password_plain) VALUES (?, ?, ?, ?, ?, ?)",
+                (uname, phash, nom, rol, creado, pwd)
+            )
+        elif row and pwd and (not row["password_plain"] or u.get("force_update")):
+            phash = hash_password(pwd)
+            cursor.execute(
+                "UPDATE usuarios SET password_hash = ?, password_plain = ?, nombre = ?, rol = ? WHERE id = ?",
+                (phash, pwd, nom, rol, row["id"])
+            )
+    conn.commit()
+    conn.close()
+    return obtener_todos_usuarios(incluir_password=True)
+
+def cambiar_clave_usuario(user_id, nueva_clave, username=None):
+    nueva_clean = str(nueva_clave or "").strip()
+    if len(nueva_clean) < 3:
+        return False, "La nueva contraseña debe tener al menos 3 caracteres"
+    phash = hash_password(nueva_clean)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    if username:
+        cursor.execute(
+            "UPDATE usuarios SET password_hash = ?, password_plain = ? WHERE LOWER(TRIM(username)) = ? OR id = ?",
+            (phash, nueva_clean, str(username).strip().lower(), user_id or -1)
+        )
+    else:
+        cursor.execute("UPDATE usuarios SET password_hash = ?, password_plain = ? WHERE id = ?", (phash, nueva_clean, user_id))
     conn.commit()
     conn.close()
     return True, "Contraseña actualizada exitosamente"
 
-def eliminar_usuario(user_id, req_user_id):
-    if int(user_id) == int(req_user_id):
+def eliminar_usuario(user_id, req_user_id=None, username=None):
+    if req_user_id is not None and user_id is not None and str(user_id) == str(req_user_id):
         return False, "No puedes eliminar tu propia cuenta de usuario"
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM usuarios WHERE id = ?", (user_id,))
+    if username:
+        cursor.execute("DELETE FROM usuarios WHERE LOWER(TRIM(username)) = ? AND LOWER(TRIM(username)) != 'admin'", (str(username).strip().lower(),))
+    if user_id is not None:
+        cursor.execute("DELETE FROM usuarios WHERE id = ? AND LOWER(TRIM(username)) != 'admin'", (user_id,))
     conn.commit()
     conn.close()
     return True, "Usuario eliminado"

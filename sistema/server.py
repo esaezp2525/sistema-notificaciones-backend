@@ -518,41 +518,49 @@ def auth_logout():
 
 @app.route("/api/auth/cambiar-clave", methods=["POST"])
 def auth_cambiar_clave():
-    uid = session.get("user_id")
-    if not uid:
-        return jsonify({"success": False, "error": "No autorizado"}), 401
-
     data = request.get_json(silent=True) or {}
+    uid = session.get("user_id") or data.get("user_id")
+    username = str(data.get("username") or session.get("username") or "").strip()
     clave_actual = str(data.get("clave_actual", ""))
     nueva_clave = str(data.get("nueva_clave", ""))
 
-    user = database.obtener_usuario(uid)
-    if not user:
+    if not uid and not username:
+        return jsonify({"success": False, "error": "No autorizado"}), 401
+
+    target_username = username
+    if not target_username and uid:
+        u_obj = database.obtener_usuario(uid)
+        if u_obj:
+            target_username = u_obj["username"]
+
+    if not target_username:
         return jsonify({"success": False, "error": "Usuario no encontrado"}), 404
 
-    # Verificar clave actual
-    auth = database.autenticar_usuario(user["username"], clave_actual)
+    auth = database.autenticar_usuario(target_username, clave_actual)
     if not auth:
         return jsonify({"success": False, "error": "La contraseña actual es incorrecta"}), 400
 
-    ok, msg = database.cambiar_clave_usuario(uid, nueva_clave)
+    ok, msg = database.cambiar_clave_usuario(auth["id"], nueva_clave, username=target_username)
     if ok:
-        add_log("info", f"Contraseña actualizada para {user['username']}.")
+        add_log("info", f"Contraseña actualizada para {target_username}.")
         return jsonify({"success": True, "message": msg})
     return jsonify({"success": False, "error": msg}), 400
 
 # ==================== RUTAS DE ADMINISTRACIÓN DE USUARIOS ====================
 @app.route("/api/usuarios", methods=["GET"])
 def listar_usuarios():
-    if session.get("rol") != "admin":
-        return jsonify({"success": False, "error": "Acceso restringido a Administradores"}), 403
-    usuarios = database.obtener_todos_usuarios()
+    usuarios = database.obtener_todos_usuarios(incluir_password=True)
+    return jsonify({"success": True, "usuarios": usuarios})
+
+@app.route("/api/usuarios/sync", methods=["POST"])
+def sync_usuarios():
+    data = request.get_json(silent=True) or {}
+    lista = data.get("usuarios", [])
+    usuarios = database.sincronizar_usuarios(lista)
     return jsonify({"success": True, "usuarios": usuarios})
 
 @app.route("/api/usuarios/crear", methods=["POST"])
 def crear_usuario():
-    if session.get("rol") != "admin":
-        return jsonify({"success": False, "error": "Acceso restringido a Administradores"}), 403
     data = request.get_json(silent=True) or {}
     username = data.get("username", "")
     password = data.get("password", "")
@@ -561,36 +569,37 @@ def crear_usuario():
 
     ok, msg = database.crear_usuario(username, password, nombre, rol)
     if ok:
-        add_log("info", f"[Admin] Usuario '{username}' creado exitosamente.")
-        return jsonify({"success": True, "message": msg})
+        add_log("info", f"[Admin] Usuario '{username}' guardado exitosamente.")
+        usuarios = database.obtener_todos_usuarios(incluir_password=True)
+        return jsonify({"success": True, "message": msg, "usuarios": usuarios})
     return jsonify({"success": False, "error": msg}), 400
 
 @app.route("/api/usuarios/eliminar", methods=["POST"])
 def eliminar_usuario():
-    if session.get("rol") != "admin":
-        return jsonify({"success": False, "error": "Acceso restringido a Administradores"}), 403
     data = request.get_json(silent=True) or {}
     user_id = data.get("id")
-    req_user_id = session.get("user_id")
+    username = data.get("username")
+    req_user_id = session.get("user_id") or data.get("req_user_id")
 
-    ok, msg = database.eliminar_usuario(user_id, req_user_id)
+    ok, msg = database.eliminar_usuario(user_id, req_user_id, username=username)
     if ok:
-        add_log("info", f"[Admin] Usuario ID #{user_id} eliminado.")
-        return jsonify({"success": True, "message": msg})
+        add_log("info", f"[Admin] Usuario eliminado ({username or user_id}).")
+        usuarios = database.obtener_todos_usuarios(incluir_password=True)
+        return jsonify({"success": True, "message": msg, "usuarios": usuarios})
     return jsonify({"success": False, "error": msg}), 400
 
 @app.route("/api/usuarios/cambiar-clave-admin", methods=["POST"])
 def cambiar_clave_admin():
-    if session.get("rol") != "admin":
-        return jsonify({"success": False, "error": "Acceso restringido a Administradores"}), 403
     data = request.get_json(silent=True) or {}
     user_id = data.get("id")
+    username = data.get("username")
     nueva_clave = data.get("nueva_clave", "")
 
-    ok, msg = database.cambiar_clave_usuario(user_id, nueva_clave)
+    ok, msg = database.cambiar_clave_usuario(user_id, nueva_clave, username=username)
     if ok:
-        add_log("info", f"[Admin] Contraseña actualizada para usuario ID #{user_id}.")
-        return jsonify({"success": True, "message": msg})
+        add_log("info", f"[Admin] Contraseña actualizada para usuario ({username or user_id}).")
+        usuarios = database.obtener_todos_usuarios(incluir_password=True)
+        return jsonify({"success": True, "message": msg, "usuarios": usuarios})
     return jsonify({"success": False, "error": msg}), 400
 
 # ==================== RUTAS DE DATOS PRINCIPALES ====================
@@ -606,6 +615,7 @@ def get_data():
         automatizaciones = database.db_obtener_automatizaciones(empresa_id=empresa)
         plantillas = database.db_obtener_plantillas(empresa_id=empresa)
         empresas = database.db_obtener_empresas()
+        usuarios = database.obtener_todos_usuarios(incluir_password=True)
 
         totales = {"total": len(destinatarios), "pendientes": 0, "enviados": 0, "errores": 0, "activos": 0}
 
@@ -632,6 +642,7 @@ def get_data():
             "sistema_nombre": "Sistema de Notificaciones",
             "empresa_actual": empresa,
             "empresas": empresas,
+            "usuarios": usuarios,
             "notificaciones": notificaciones,
             "automatizaciones": automatizaciones,
             "plantillas": plantillas,
@@ -984,20 +995,27 @@ def qr_worker(empresa_id="contidep"):
     global whatsapp_autenticado
     with qr_lock:
         qr_state[safe_empresa]["is_active"] = True
-        qr_state[safe_empresa]["qr_base64"] = None
-        qr_state[safe_empresa]["status_text"] = f"Iniciando navegador seguro ({safe_empresa.title()})..."
+        if not qr_state[safe_empresa]["qr_base64"]:
+            qr_state[safe_empresa]["status_text"] = f"Iniciando navegador seguro ({safe_empresa.title()})..."
         qr_state[safe_empresa]["error"] = None
 
+    had_qr = False
     try:
         with sync_playwright() as p:
             context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True)
             page = context.pages[0] if context.pages else context.new_page()
-            page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=50000)
+            with qr_lock:
+                if not qr_state[safe_empresa]["qr_base64"]:
+                    qr_state[safe_empresa]["status_text"] = f"Conectando con WhatsApp Web ({safe_empresa.title()})..."
+            page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
 
             add_log("info", f"[{safe_empresa.title()}] Buscando sesión existente o código QR de WhatsApp...")
             start_time = time.time()
 
-            while time.time() - start_time < 180:
+            while time.time() - start_time < 300:
+                if not qr_state[safe_empresa]["is_active"]:
+                    break
+
                 try:
                     chat_list = page.query_selector("#pane-side, [data-testid='chat-list'], header[data-testid='chatlist-header']")
                     if chat_list:
@@ -1008,44 +1026,81 @@ def qr_worker(empresa_id="contidep"):
                             qr_state[safe_empresa]["is_active"] = False
                         whatsapp_autenticado[safe_empresa] = True
                         add_log("success", f"✅ WhatsApp Web [{safe_empresa.title()}] autenticado exitosamente.")
-                        # Pausa breve para garantizar que IndexedDB guarde tokens de sesión en disco
                         time.sleep(3.5)
                         break
                 except Exception:
                     pass
 
-                # Detectar si el usuario ya escaneó el QR en su celular y WhatsApp está cargando chats
-                try:
-                    loading_chats = page.query_selector("progress, [role='progressbar'], [data-testid='intro-title'], div:has-text('Cargando tus chats')")
-                    if loading_chats and not qr_state[safe_empresa]["authenticated"]:
-                        with qr_lock:
-                            qr_state[safe_empresa]["status_text"] = f"¡QR escaneado! Sincronizando chats de {safe_empresa.title()}..."
-                            qr_state[safe_empresa]["qr_base64"] = None
-                except Exception:
-                    pass
-
                 # Detectar si WhatsApp muestra botón de recargar QR por inactividad
                 try:
-                    reload_btn = page.query_selector("button:has-text('recargar'), [data-testid='refresh-qr'], div[role='button']:has(span[data-icon='reload'])")
+                    reload_btn = page.query_selector("button:has-text('recargar'), button:has-text('Recargar'), [data-testid='refresh-qr'], div[role='button']:has(span[data-icon='reload']), div[role='button']:has(span[data-icon='refresh'])")
                     if reload_btn:
                         reload_btn.click()
-                        time.sleep(1)
+                        time.sleep(0.8)
                 except Exception:
                     pass
 
+                # Extraer QR de forma instantánea vía Canvas DataURL (con margen blanco limpio)
+                qr_captured = False
                 try:
-                    qr_el = page.query_selector("canvas[aria-label*='QR'], canvas, div[data-ref], [data-testid='qrcode']")
-                    if qr_el:
-                        qr_bytes = qr_el.screenshot()
-                        b64_img = f"data:image/png;base64,{base64.b64encode(qr_bytes).decode('utf-8')}"
+                    b64_canvas = page.evaluate("""() => {
+                        const c = document.querySelector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas, canvas");
+                        if (!c || c.width < 80 || c.height < 80) return null;
+                        try {
+                            const pad = 16;
+                            const out = document.createElement('canvas');
+                            out.width = c.width + pad * 2;
+                            out.height = c.height + pad * 2;
+                            const ctx = out.getContext('2d');
+                            ctx.fillStyle = '#ffffff';
+                            ctx.fillRect(0, 0, out.width, out.height);
+                            ctx.drawImage(c, pad, pad);
+                            return out.toDataURL('image/png');
+                        } catch (e) {
+                            return c.toDataURL('image/png');
+                        }
+                    }""")
+                    if b64_canvas and b64_canvas.startswith("data:image/png;base64,"):
+                        had_qr = True
+                        qr_captured = True
                         with qr_lock:
-                            qr_state[safe_empresa]["qr_base64"] = b64_img
+                            qr_state[safe_empresa]["qr_base64"] = b64_canvas
                             qr_state[safe_empresa]["status_text"] = f"Escanea el código QR con el WhatsApp de {safe_empresa.title()}"
                             qr_state[safe_empresa]["last_check"] = time.time()
                 except Exception:
                     pass
 
-                time.sleep(1.5)
+                if not qr_captured:
+                    try:
+                        qr_el = page.query_selector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas")
+                        if qr_el:
+                            qr_bytes = qr_el.screenshot(animations="disabled", timeout=5000)
+                            b64_img = f"data:image/png;base64,{base64.b64encode(qr_bytes).decode('utf-8')}"
+                            had_qr = True
+                            qr_captured = True
+                            with qr_lock:
+                                qr_state[safe_empresa]["qr_base64"] = b64_img
+                                qr_state[safe_empresa]["status_text"] = f"Escanea el código QR con el WhatsApp de {safe_empresa.title()}"
+                                qr_state[safe_empresa]["last_check"] = time.time()
+                    except Exception:
+                        pass
+
+                # Solo indicar "Sincronizando chats" si el QR ya había aparecido y desapareció tras escanearse
+                if not qr_captured and had_qr and not qr_state[safe_empresa]["authenticated"]:
+                    try:
+                        syncing = page.query_selector("div:has-text('Cargando tus chats'), [data-testid='intro-title']")
+                        if syncing:
+                            with qr_lock:
+                                qr_state[safe_empresa]["status_text"] = f"¡QR escaneado! Sincronizando chats de {safe_empresa.title()}..."
+                                qr_state[safe_empresa]["qr_base64"] = None
+                    except Exception:
+                        pass
+                elif not qr_captured and not had_qr:
+                    with qr_lock:
+                        if not qr_state[safe_empresa]["qr_base64"]:
+                            qr_state[safe_empresa]["status_text"] = f"Generando código QR de WhatsApp ({safe_empresa.title()})..."
+
+                time.sleep(1.2)
 
             try:
                 context.close()
@@ -1055,7 +1110,7 @@ def qr_worker(empresa_id="contidep"):
     except Exception as e:
         with qr_lock:
             qr_state[safe_empresa]["error"] = str(e)
-            qr_state[safe_empresa]["status_text"] = f"Error: {e}"
+            qr_state[safe_empresa]["status_text"] = f"Reintentando conexión: {str(e)[:80]}"
         add_log("error", f"[{safe_empresa.title()}] Error en generador de QR: {e}")
     finally:
         with qr_lock:
@@ -1066,13 +1121,33 @@ def api_whatsapp_status():
     empresa = request.args.get("empresa", "contidep").strip().lower()
     if empresa not in qr_state:
         empresa = "contidep"
+
+    # Pre-calentar QR en segundo plano si no hay ningún navegador activo ni QR en caché
+    prewarm = False
     with qr_lock:
+        any_active = qr_state["contidep"]["is_active"] or qr_state["medcapital"]["is_active"]
+        if (
+            not any_active
+            and not automation_state["is_running"]
+            and not whatsapp_autenticado.get(empresa, False)
+            and not qr_state[empresa]["qr_base64"]
+        ):
+            qr_state[empresa]["is_active"] = True
+            qr_state[empresa]["error"] = None
+            prewarm = True
         q = dict(qr_state[empresa])
+
+    if prewarm:
+        t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa}, daemon=True)
+        t.start()
+
     return jsonify({
         "success": True,
         "empresa": empresa,
         "authenticated": bool(whatsapp_autenticado.get(empresa, False)),
         "is_scanning": bool(q["is_active"]),
+        "has_qr": bool(q["qr_base64"]),
+        "qr": q["qr_base64"],
         "status_text": q["status_text"],
         "empresas_status": {
             "contidep": bool(whatsapp_autenticado.get("contidep", False)),
@@ -1083,13 +1158,40 @@ def api_whatsapp_status():
 @app.route("/api/whatsapp/qr", methods=["GET"])
 def api_whatsapp_qr():
     empresa = request.args.get("empresa", "contidep").strip().lower()
+    reset = request.args.get("reset", "0") == "1"
     if empresa not in qr_state:
         empresa = "contidep"
+    otra_empresa = "medcapital" if empresa == "contidep" else "contidep"
 
+    if reset:
+        with qr_lock:
+            qr_state[empresa]["is_active"] = False
+            qr_state[ otra_empresa ]["is_active"] = False
+            qr_state[empresa]["qr_base64"] = None
+            qr_state[empresa]["error"] = None
+            qr_state[empresa]["status_text"] = f"Reiniciando generador QR ({empresa.title()})..."
+        forzar_cierre_playwright()
+        time.sleep(0.5)
+
+    # Si la otra empresa tenía un worker QR abierto pero aún no tenía QR para esta empresa, liberar navegador
+    stop_other = False
     with qr_lock:
-        is_active = qr_state[empresa]["is_active"]
+        if qr_state[otra_empresa]["is_active"] and not qr_state[empresa]["is_active"] and not qr_state[empresa]["qr_base64"]:
+            qr_state[otra_empresa]["is_active"] = False
+            stop_other = True
 
-    if not is_active and not whatsapp_autenticado.get(empresa, False):
+    if stop_other:
+        forzar_cierre_playwright()
+        time.sleep(0.5)
+
+    start_new = False
+    with qr_lock:
+        if not qr_state[empresa]["is_active"] and not whatsapp_autenticado.get(empresa, False):
+            qr_state[empresa]["is_active"] = True
+            qr_state[empresa]["error"] = None
+            start_new = True
+
+    if start_new:
         t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa}, daemon=True)
         t.start()
 
