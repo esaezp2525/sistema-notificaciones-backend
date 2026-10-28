@@ -681,8 +681,10 @@ async function verificarEstadoWhatsApp() {
   try {
     const res = await fetch(getApiEndpoint(`/api/whatsapp/status?empresa=${currentEmpresa}`));
     const data = await res.json();
-    if (data.qr) {
+    if (data.qr && data.is_scanning) {
       cachedQrByEmpresa[currentEmpresa] = data.qr;
+    } else if (!data.is_scanning) {
+      cachedQrByEmpresa[currentEmpresa] = null;
     }
     if (data.authenticated) {
       cachedQrByEmpresa[currentEmpresa] = null;
@@ -800,8 +802,12 @@ function abrirModalQR(forceReset = false) {
         showToast(`¡WhatsApp de ${cfg.nombre} vinculado exitosamente!`, 'success');
         return;
       } else if (data.status_text && statusText) {
-        // Evitar mostrar mensaje engañoso de "QR escaneado" si aún no se ha mostrado ningún QR
-        if (data.status_text.includes('QR escaneado') && !cachedQrByEmpresa[currentEmpresa]) {
+        if ((data.status_text.includes('QR escaneado') || data.status_text.includes('Vinculando')) && cachedQrByEmpresa[currentEmpresa]) {
+          cachedQrByEmpresa[currentEmpresa] = null;
+          if (displayContainer) displayContainer.style.display = 'none';
+          if (loadingState) loadingState.style.display = 'block';
+          statusText.textContent = data.status_text;
+        } else if (data.status_text.includes('QR escaneado') && !cachedQrByEmpresa[currentEmpresa]) {
           statusText.textContent = `Cargando código QR de WhatsApp para ${cfg.nombre} (${elapsedPolls * 2}s)...`;
         } else {
           statusText.textContent = data.status_text;
@@ -947,6 +953,35 @@ function iniciarPollingLogs() {
           taskBadge.textContent = data.tarea_actual;
         } else {
           taskBadge.style.display = 'none';
+        }
+      }
+
+      if (data.whatsapp_autenticado && typeof data.whatsapp_autenticado[currentEmpresa] === 'boolean') {
+        const isAuth = data.whatsapp_autenticado[currentEmpresa];
+        const dot = document.getElementById('wa-status-dot');
+        const text = document.getElementById('wa-status-text');
+        const btnWA = document.getElementById('btn-probar-wa');
+        const btnDisconnect = document.getElementById('btn-desconectar-wa-empresa');
+        const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
+        if (isAuth) {
+          cachedQrByEmpresa[currentEmpresa] = null;
+          if (dot) dot.className = 'status-dot online';
+          if (text) text.textContent = `WA ${cfg.nombre}: Conectado`;
+          if (btnWA) {
+            btnWA.textContent = '🔌 Desvincular';
+            btnWA.style.color = '#ef4444';
+            btnWA.title = `Desvincular WhatsApp de ${cfg.nombre}`;
+          }
+          if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
+        } else {
+          if (dot) dot.className = 'status-dot offline';
+          if (text) text.textContent = `WA ${cfg.nombre}: Desconectado`;
+          if (btnWA) {
+            btnWA.textContent = '📲 Conectar';
+            btnWA.style.color = '';
+            btnWA.title = `Vincular WhatsApp de ${cfg.nombre}`;
+          }
+          if (btnDisconnect) btnDisconnect.style.display = 'none';
         }
       }
 
