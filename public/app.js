@@ -70,14 +70,37 @@ const DEFAULT_PLANTILLAS_CHILENAS = [
   }
 ];
 
+const LOCAL_MOTOR_API = 'http://127.0.0.1:5829';
 let currentEmpresa = localStorage.getItem(STORAGE_KEY_EMPRESA) || 'contidep';
 let currentUser = null;
 let savedApi = localStorage.getItem(STORAGE_KEY_API);
-if (!savedApi || (window.location.protocol === 'https:' && savedApi.startsWith('http:')) || savedApi.includes('127.0.0.1') || savedApi.includes('localhost')) {
+if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+  savedApi = window.location.origin;
+} else if (!savedApi || savedApi.includes('127.0.0.1') || savedApi.includes('localhost')) {
   savedApi = DEFAULT_CLOUD_API;
   localStorage.setItem(STORAGE_KEY_API, DEFAULT_CLOUD_API);
 }
 let apiUrl = savedApi;
+let localMotorAvailable = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
+
+async function detectarMotorLocal() {
+  if (localMotorAvailable) return true;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 1400);
+    const res = await fetch(`${LOCAL_MOTOR_API}/api/logs`, { signal: controller.signal });
+    clearTimeout(timer);
+    if (res.ok) {
+      localMotorAvailable = true;
+      apiUrl = LOCAL_MOTOR_API;
+      console.info('[Motor] Motor local rápido detectado en 127.0.0.1:5829');
+      return true;
+    }
+  } catch (e) {
+    // Motor local no activo o bloqueado por navegador; usar motor en la nube (Render)
+  }
+  return false;
+}
 
 let destinatariosData = [];
 let notificacionesData = [];
@@ -175,11 +198,12 @@ function initDefaultStorage() {
 }
 
 // ==================== INICIALIZACIÓN ====================
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
   initDefaultStorage();
   setupTabs();
   setupEventListeners();
   initEmojiPickers();
+  await detectarMotorLocal();
   sincronizarUsuariosConServidor();
   verificarSesion();
   iniciarPollingLogs();
@@ -642,7 +666,7 @@ let cachedQrByEmpresa = { contidep: null, medcapital: null };
 
 function getApiEndpoint(path) {
   let base = apiUrl || DEFAULT_CLOUD_API;
-  if (window.location.protocol === 'https:' && (base.startsWith('http:') || base.includes('127.0.0.1') || base.includes('localhost'))) {
+  if (!localMotorAvailable && window.location.protocol === 'https:' && (base.startsWith('http:') || base.includes('127.0.0.1') || base.includes('localhost'))) {
     base = DEFAULT_CLOUD_API;
   }
   return `${base.replace(/\/+$/, '')}${path}`;
@@ -746,8 +770,11 @@ function abrirModalQR(forceReset = false) {
   if (qrPollInterval) clearInterval(qrPollInterval);
   let firstCall = true;
   let elapsedPolls = 0;
+  let pollInFlight = false;
 
   async function pollQR() {
+    if (pollInFlight) return;
+    pollInFlight = true;
     elapsedPolls++;
     try {
       const resetParam = (forceReset && firstCall) ? '&reset=1' : '';
@@ -781,14 +808,20 @@ function abrirModalQR(forceReset = false) {
         }
       }
     } catch (e) {
+      if (localMotorAvailable && apiUrl === LOCAL_MOTOR_API) {
+        localMotorAvailable = false;
+        apiUrl = DEFAULT_CLOUD_API;
+      }
       if (statusText && !cachedQrByEmpresa[currentEmpresa]) {
         statusText.innerHTML = `Despertando motor de WhatsApp en la nube (${elapsedPolls * 2}s)...<br><span style="font-size:11.5px; color:#64748b;">Por favor espera unos segundos mientras inicia el navegador seguro.</span>`;
       }
+    } finally {
+      pollInFlight = false;
     }
   }
 
   pollQR();
-  qrPollInterval = setInterval(pollQR, 2000);
+  qrPollInterval = setInterval(pollQR, 1800);
 }
 
 function cerrarModalQR() {

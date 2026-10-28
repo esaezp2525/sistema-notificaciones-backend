@@ -8,7 +8,6 @@ import threading
 import subprocess
 from datetime import datetime, date, timedelta
 import calendar
-import pandas as pd
 import base64
 from flask import Flask, jsonify, request, render_template, session
 from flask_cors import CORS
@@ -16,9 +15,17 @@ from playwright.sync_api import sync_playwright
 
 import database
 
-app = Flask(__name__)
+app = Flask(__name__, static_url_path="", static_folder="static")
 app.secret_key = "sistema_notificaciones_secret_key_2026_antigravity_token"
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
+
+@app.after_request
+def add_pna_headers(response):
+    response.headers["Access-Control-Allow-Origin"] = request.headers.get("Origin", "*")
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    response.headers["Access-Control-Allow-Private-Network"] = "true"
+    return response
 
 IS_HEADLESS = os.environ.get("HEADLESS", "false").lower() in ("true", "1", "yes") or sys.platform != "win32"
 PORT = int(os.environ.get("PORT", 5829))
@@ -139,6 +146,18 @@ def calcular_proximo_envio(auto):
     return f"{nombre_dia} {objetivo.day} de {nombre_mes} de {objetivo.year} a las {objetivo.strftime('%H:%M')} hrs ({etiqueta_mod}){' (Mensual)' if auto.get('repetir_mensual', True) else ''}"
 
 # ==================== CONTROL DE PLAYWRIGHT ====================
+playwright_browser_lock = threading.Lock()
+
+def limpiar_locks_perfil(sess_dir):
+    """Elimina archivos de bloqueo huérfanos de Chromium en el directorio de sesión."""
+    for lock_name in ("SingletonLock", "SingletonCookie", "SingletonSocket"):
+        lock_path = os.path.join(sess_dir, lock_name)
+        try:
+            if os.path.exists(lock_path) or os.path.islink(lock_path):
+                os.remove(lock_path)
+        except Exception:
+            pass
+
 def forzar_cierre_playwright():
     """Cierra instancias huérfanas de Chrome asociadas al perfil de WhatsApp."""
     try:
@@ -146,19 +165,23 @@ def forzar_cierre_playwright():
             subprocess.run(
                 ["powershell", "-NoProfile", "-Command",
                  "Get-Process chrome,msedge,chromium -ErrorAction SilentlyContinue | Where-Object { $_.CommandLine -like '*whatsapp_session*' } | Stop-Process -Force"],
-                capture_output=True, timeout=8
+                capture_output=True, timeout=6
             )
         else:
-            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True)
+            subprocess.run(["pkill", "-9", "-f", "chromium"], capture_output=True, timeout=5)
     except Exception:
         pass
+    for emp in ("contidep", "medcapital"):
+        limpiar_locks_perfil(get_session_dir(emp))
 
-def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None):
-    """Abre el navegador persistente para WhatsApp Web evitando bloqueos de perfil y de automatización."""
+def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None, lightweight_qr=False):
+    """Abre el navegador persistente para WhatsApp Web optimizado en memoria y CPU."""
     if headless is None:
         headless = IS_HEADLESS
     sess_dir = get_session_dir(empresa_id)
+    limpiar_locks_perfil(sess_dir)
     ultimo_error = None
+    vw, vh = (860, 640) if lightweight_qr else (1280, 800)
     for intento in range(3):
         try:
             ctx = p.chromium.launch_persistent_context(
@@ -172,12 +195,27 @@ def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None):
                     "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
                     "--disable-gpu",
+                    "--disable-software-rasterizer",
                     "--disable-extensions",
+                    "--disable-background-networking",
+                    "--disable-background-timer-throttling",
+                    "--disable-backgrounding-occluded-windows",
+                    "--disable-breakpad",
+                    "--disable-component-extensions-with-background-pages",
+                    "--disable-default-apps",
+                    "--disable-features=TranslateUI,BlinkGenPropertyTrees,IsolateOrigins,site-per-process",
+                    "--disable-ipc-flooding-protection",
+                    "--disable-renderer-backgrounding",
+                    "--disable-sync",
+                    "--metrics-recording-only",
+                    "--mute-audio",
                     "--no-first-run",
-                    "--window-size=1280,800"
+                    "--no-default-browser-check",
+                    "--js-flags=--max-old-space-size=256",
+                    f"--window-size={vw},{vh}"
                 ],
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                viewport={"width": 1280, "height": 800}
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+                viewport={"width": vw, "height": vh}
             )
             ctx.add_init_script("Object.defineProperty(navigator, 'webdriver', { get: () => undefined });")
             return ctx
@@ -185,7 +223,7 @@ def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None):
             ultimo_error = e
             add_log("warning", f"[{empresa_id.title()}] Intento {intento+1}: Carpeta bloqueada. Liberando procesos...")
             forzar_cierre_playwright()
-            time.sleep(1.5)
+            time.sleep(1.0)
     raise ultimo_error
 
 # ==================== TRABAJADOR DE ENVÍOS (WORKER) ====================
@@ -977,7 +1015,8 @@ qr_state = {
         "qr_base64": None,
         "last_check": 0,
         "status_text": "Iniciando conexión con WhatsApp...",
-        "error": None
+        "error": None,
+        "run_id": 0
     },
     "medcapital": {
         "is_active": False,
@@ -985,145 +1024,195 @@ qr_state = {
         "qr_base64": None,
         "last_check": 0,
         "status_text": "Iniciando conexión con WhatsApp...",
-        "error": None
+        "error": None,
+        "run_id": 0
     }
 }
 qr_lock = threading.Lock()
+qr_global_run_id = 0
 
-def qr_worker(empresa_id="contidep"):
+def qr_worker(empresa_id="contidep", run_id=0):
     safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     global whatsapp_autenticado
+
     with qr_lock:
+        if qr_global_run_id != run_id:
+            return
         qr_state[safe_empresa]["is_active"] = True
         if not qr_state[safe_empresa]["qr_base64"]:
             qr_state[safe_empresa]["status_text"] = f"Iniciando navegador seguro ({safe_empresa.title()})..."
         qr_state[safe_empresa]["error"] = None
 
     had_qr = False
-    try:
-        with sync_playwright() as p:
-            context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True)
-            page = context.pages[0] if context.pages else context.new_page()
-            with qr_lock:
-                if not qr_state[safe_empresa]["qr_base64"]:
-                    qr_state[safe_empresa]["status_text"] = f"Conectando con WhatsApp Web ({safe_empresa.title()})..."
-            page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
+    with playwright_browser_lock:
+        with qr_lock:
+            if qr_global_run_id != run_id or not qr_state[safe_empresa]["is_active"]:
+                return
 
-            add_log("info", f"[{safe_empresa.title()}] Buscando sesión existente o código QR de WhatsApp...")
-            start_time = time.time()
+        try:
+            with sync_playwright() as p:
+                context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True, lightweight_qr=True)
+                page = context.pages[0] if context.pages else context.new_page()
 
-            while time.time() - start_time < 300:
-                if not qr_state[safe_empresa]["is_active"]:
-                    break
+                # Bloquear fuentes, audio/video e imágenes externas pesadas para acelerar carga y ahorrar RAM en la nube
+                def intercept_route(route):
+                    try:
+                        rtype = route.request.resource_type
+                        if rtype in ("media", "font", "image"):
+                            route.abort()
+                        else:
+                            route.continue_()
+                    except Exception:
+                        pass
 
                 try:
-                    chat_list = page.query_selector("#pane-side, [data-testid='chat-list'], header[data-testid='chatlist-header']")
-                    if chat_list:
+                    page.route("**/*", intercept_route)
+                except Exception:
+                    pass
+
+                with qr_lock:
+                    if qr_global_run_id == run_id and not qr_state[safe_empresa]["qr_base64"]:
+                        qr_state[safe_empresa]["status_text"] = f"Conectando con WhatsApp Web ({safe_empresa.title()})..."
+
+                page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
+
+                add_log("info", f"[{safe_empresa.title()}] Buscando sesión existente o código QR de WhatsApp...")
+                start_time = time.time()
+                consecutive_errors = 0
+
+                while time.time() - start_time < 240:
+                    with qr_lock:
+                        if not qr_state[safe_empresa]["is_active"] or qr_global_run_id != run_id:
+                            break
+
+                    try:
+                        res = page.evaluate("""() => {
+                            // 1. Verificar si ya entró a la lista de chats
+                            const chatList = document.querySelector("#pane-side, [data-testid='chat-list'], header[data-testid='chatlist-header']");
+                            if (chatList) {
+                                return { state: 'authenticated' };
+                            }
+
+                            // 2. Verificar si hay botón de recargar QR por expiración
+                            const reloadIcon = document.querySelector("[data-testid='refresh-qr'], span[data-icon='refresh'], span[data-icon='reload'], span[data-icon='refresh-large']");
+                            if (reloadIcon) {
+                                const btn = reloadIcon.closest("button, div[role='button']") || reloadIcon;
+                                btn.click();
+                                return { state: 'reloading' };
+                            }
+                            const buttons = document.querySelectorAll("button, div[role='button']");
+                            for (const b of buttons) {
+                                const txt = (b.innerText || "").toLowerCase();
+                                if (txt.includes("recargar") || txt.includes("reload") || txt.includes("reintentar")) {
+                                    b.click();
+                                    return { state: 'reloading' };
+                                }
+                            }
+
+                            // 3. Extraer QR desde el canvas con margen blanco
+                            const c = document.querySelector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas, canvas");
+                            if (c && c.width >= 80 && c.height >= 80) {
+                                try {
+                                    const pad = 16;
+                                    const out = document.createElement('canvas');
+                                    out.width = c.width + pad * 2;
+                                    out.height = c.height + pad * 2;
+                                    const ctx = out.getContext('2d');
+                                    ctx.fillStyle = '#ffffff';
+                                    ctx.fillRect(0, 0, out.width, out.height);
+                                    ctx.drawImage(c, pad, pad);
+                                    return { state: 'qr', data: out.toDataURL('image/png') };
+                                } catch (e) {
+                                    return { state: 'qr', data: c.toDataURL('image/png') };
+                                }
+                            }
+
+                            // 4. Verificar si está sincronizando chats después de escanear
+                            const bodyTxt = document.body ? (document.body.innerText || "") : "";
+                            if (bodyTxt.includes("Cargando tus chats") || bodyTxt.includes("Loading your chats") || document.querySelector("[data-testid='intro-title']")) {
+                                return { state: 'syncing' };
+                            }
+
+                            return { state: 'loading' };
+                        }""")
+                        consecutive_errors = 0
+                    except Exception as eval_err:
+                        consecutive_errors += 1
+                        err_str = str(eval_err).lower()
+                        if consecutive_errors >= 4 or "closed" in err_str or "crashed" in err_str or "target" in err_str:
+                            raise eval_err
+                        time.sleep(1.0)
+                        continue
+
+                    state = res.get("state") if isinstance(res, dict) else "loading"
+
+                    if state == "authenticated":
                         with qr_lock:
-                            qr_state[safe_empresa]["authenticated"] = True
-                            qr_state[safe_empresa]["status_text"] = f"¡WhatsApp {safe_empresa.title()} Conectado con Éxito!"
-                            qr_state[safe_empresa]["qr_base64"] = None
-                            qr_state[safe_empresa]["is_active"] = False
+                            if qr_global_run_id == run_id:
+                                qr_state[safe_empresa]["authenticated"] = True
+                                qr_state[safe_empresa]["status_text"] = f"¡WhatsApp {safe_empresa.title()} Conectado con Éxito!"
+                                qr_state[safe_empresa]["qr_base64"] = None
+                                qr_state[safe_empresa]["is_active"] = False
                         whatsapp_autenticado[safe_empresa] = True
                         add_log("success", f"✅ WhatsApp Web [{safe_empresa.title()}] autenticado exitosamente.")
-                        time.sleep(3.5)
+                        time.sleep(2.5)
                         break
-                except Exception:
-                    pass
 
-                # Detectar si WhatsApp muestra botón de recargar QR por inactividad
-                try:
-                    reload_btn = page.query_selector("button:has-text('recargar'), button:has-text('Recargar'), [data-testid='refresh-qr'], div[role='button']:has(span[data-icon='reload']), div[role='button']:has(span[data-icon='refresh'])")
-                    if reload_btn:
-                        reload_btn.click()
-                        time.sleep(0.8)
-                except Exception:
-                    pass
-
-                # Extraer QR de forma instantánea vía Canvas DataURL (con margen blanco limpio)
-                qr_captured = False
-                try:
-                    b64_canvas = page.evaluate("""() => {
-                        const c = document.querySelector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas, canvas");
-                        if (!c || c.width < 80 || c.height < 80) return null;
-                        try {
-                            const pad = 16;
-                            const out = document.createElement('canvas');
-                            out.width = c.width + pad * 2;
-                            out.height = c.height + pad * 2;
-                            const ctx = out.getContext('2d');
-                            ctx.fillStyle = '#ffffff';
-                            ctx.fillRect(0, 0, out.width, out.height);
-                            ctx.drawImage(c, pad, pad);
-                            return out.toDataURL('image/png');
-                        } catch (e) {
-                            return c.toDataURL('image/png');
-                        }
-                    }""")
-                    if b64_canvas and b64_canvas.startswith("data:image/png;base64,"):
-                        had_qr = True
-                        qr_captured = True
-                        with qr_lock:
-                            qr_state[safe_empresa]["qr_base64"] = b64_canvas
-                            qr_state[safe_empresa]["status_text"] = f"Escanea el código QR con el WhatsApp de {safe_empresa.title()}"
-                            qr_state[safe_empresa]["last_check"] = time.time()
-                except Exception:
-                    pass
-
-                if not qr_captured:
-                    try:
-                        qr_el = page.query_selector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas")
-                        if qr_el:
-                            qr_bytes = qr_el.screenshot(animations="disabled", timeout=5000)
-                            b64_img = f"data:image/png;base64,{base64.b64encode(qr_bytes).decode('utf-8')}"
+                    elif state == "qr":
+                        b64_canvas = res.get("data")
+                        if b64_canvas and b64_canvas.startswith("data:image/png;base64,"):
+                            if not had_qr:
+                                add_log("info", f"[{safe_empresa.title()}] Código QR generado y listo para escanear.")
                             had_qr = True
-                            qr_captured = True
                             with qr_lock:
-                                qr_state[safe_empresa]["qr_base64"] = b64_img
-                                qr_state[safe_empresa]["status_text"] = f"Escanea el código QR con el WhatsApp de {safe_empresa.title()}"
-                                qr_state[safe_empresa]["last_check"] = time.time()
-                    except Exception:
-                        pass
+                                if qr_global_run_id == run_id:
+                                    qr_state[safe_empresa]["qr_base64"] = b64_canvas
+                                    qr_state[safe_empresa]["status_text"] = f"Escanea el código QR con el WhatsApp de {safe_empresa.title()}"
+                                    qr_state[safe_empresa]["last_check"] = time.time()
 
-                # Solo indicar "Sincronizando chats" si el QR ya había aparecido y desapareció tras escanearse
-                if not qr_captured and had_qr and not qr_state[safe_empresa]["authenticated"]:
-                    try:
-                        syncing = page.query_selector("div:has-text('Cargando tus chats'), [data-testid='intro-title']")
-                        if syncing:
-                            with qr_lock:
+                    elif state == "syncing" and had_qr:
+                        with qr_lock:
+                            if qr_global_run_id == run_id and not qr_state[safe_empresa]["authenticated"]:
                                 qr_state[safe_empresa]["status_text"] = f"¡QR escaneado! Sincronizando chats de {safe_empresa.title()}..."
                                 qr_state[safe_empresa]["qr_base64"] = None
-                    except Exception:
-                        pass
-                elif not qr_captured and not had_qr:
-                    with qr_lock:
-                        if not qr_state[safe_empresa]["qr_base64"]:
-                            qr_state[safe_empresa]["status_text"] = f"Generando código QR de WhatsApp ({safe_empresa.title()})..."
 
-                time.sleep(1.2)
+                    elif not had_qr:
+                        elapsed = int(time.time() - start_time)
+                        with qr_lock:
+                            if qr_global_run_id == run_id and not qr_state[safe_empresa]["qr_base64"]:
+                                qr_state[safe_empresa]["status_text"] = f"Generando código QR de WhatsApp ({safe_empresa.title()})... ({elapsed}s)"
 
-            try:
-                context.close()
-            except Exception:
-                pass
-            forzar_cierre_playwright()
-    except Exception as e:
-        with qr_lock:
-            qr_state[safe_empresa]["error"] = str(e)
-            qr_state[safe_empresa]["status_text"] = f"Reintentando conexión: {str(e)[:80]}"
-        add_log("error", f"[{safe_empresa.title()}] Error en generador de QR: {e}")
-    finally:
-        with qr_lock:
-            qr_state[safe_empresa]["is_active"] = False
+                    # Si ya tenemos QR, consultar cada 1.8s para ahorrar CPU; si aún está generando, cada 0.9s
+                    time.sleep(1.8 if had_qr else 0.9)
+
+                try:
+                    context.close()
+                except Exception:
+                    pass
+        except Exception as e:
+            with qr_lock:
+                if qr_global_run_id == run_id:
+                    qr_state[safe_empresa]["error"] = str(e)
+                    qr_state[safe_empresa]["status_text"] = f"Reintentando conexión ({safe_empresa.title()})..."
+            add_log("error", f"[{safe_empresa.title()}] Error en generador de QR: {e}")
+        finally:
+            with qr_lock:
+                is_current = (qr_global_run_id == run_id)
+                if is_current:
+                    qr_state[safe_empresa]["is_active"] = False
+            if is_current:
+                forzar_cierre_playwright()
 
 @app.route("/api/whatsapp/status", methods=["GET"])
 def api_whatsapp_status():
+    global qr_global_run_id
     empresa = request.args.get("empresa", "contidep").strip().lower()
     if empresa not in qr_state:
         empresa = "contidep"
 
     # Pre-calentar QR en segundo plano si no hay ningún navegador activo ni QR en caché
     prewarm = False
+    new_run_id = 0
     with qr_lock:
         any_active = qr_state["contidep"]["is_active"] or qr_state["medcapital"]["is_active"]
         if (
@@ -1132,13 +1221,16 @@ def api_whatsapp_status():
             and not whatsapp_autenticado.get(empresa, False)
             and not qr_state[empresa]["qr_base64"]
         ):
+            qr_global_run_id += 1
+            new_run_id = qr_global_run_id
+            qr_state[empresa]["run_id"] = new_run_id
             qr_state[empresa]["is_active"] = True
             qr_state[empresa]["error"] = None
             prewarm = True
         q = dict(qr_state[empresa])
 
     if prewarm:
-        t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa}, daemon=True)
+        t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa, "run_id": new_run_id}, daemon=True)
         t.start()
 
     return jsonify({
@@ -1157,6 +1249,7 @@ def api_whatsapp_status():
 
 @app.route("/api/whatsapp/qr", methods=["GET"])
 def api_whatsapp_qr():
+    global qr_global_run_id
     empresa = request.args.get("empresa", "contidep").strip().lower()
     reset = request.args.get("reset", "0") == "1"
     if empresa not in qr_state:
@@ -1165,34 +1258,38 @@ def api_whatsapp_qr():
 
     if reset:
         with qr_lock:
+            qr_global_run_id += 1
             qr_state[empresa]["is_active"] = False
-            qr_state[ otra_empresa ]["is_active"] = False
+            qr_state[otra_empresa]["is_active"] = False
             qr_state[empresa]["qr_base64"] = None
             qr_state[empresa]["error"] = None
             qr_state[empresa]["status_text"] = f"Reiniciando generador QR ({empresa.title()})..."
         forzar_cierre_playwright()
-        time.sleep(0.5)
 
     # Si la otra empresa tenía un worker QR abierto pero aún no tenía QR para esta empresa, liberar navegador
     stop_other = False
     with qr_lock:
         if qr_state[otra_empresa]["is_active"] and not qr_state[empresa]["is_active"] and not qr_state[empresa]["qr_base64"]:
+            qr_global_run_id += 1
             qr_state[otra_empresa]["is_active"] = False
             stop_other = True
 
     if stop_other:
         forzar_cierre_playwright()
-        time.sleep(0.5)
 
     start_new = False
+    new_run_id = 0
     with qr_lock:
         if not qr_state[empresa]["is_active"] and not whatsapp_autenticado.get(empresa, False):
+            qr_global_run_id += 1
+            new_run_id = qr_global_run_id
+            qr_state[empresa]["run_id"] = new_run_id
             qr_state[empresa]["is_active"] = True
             qr_state[empresa]["error"] = None
             start_new = True
 
     if start_new:
-        t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa}, daemon=True)
+        t = threading.Thread(target=qr_worker, kwargs={"empresa_id": empresa, "run_id": new_run_id}, daemon=True)
         t.start()
 
     with qr_lock:
@@ -1209,10 +1306,12 @@ def api_whatsapp_qr():
 
 @app.route("/api/whatsapp/desconectar", methods=["POST"])
 def api_whatsapp_desconectar():
+    global qr_global_run_id
     data = request.get_json(silent=True) or {}
     empresa = request.args.get("empresa") or data.get("empresa", "contidep")
     safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
     with qr_lock:
+        qr_global_run_id += 1
         whatsapp_autenticado[safe_empresa] = False
         qr_state[safe_empresa]["authenticated"] = False
         qr_state[safe_empresa]["qr_base64"] = None

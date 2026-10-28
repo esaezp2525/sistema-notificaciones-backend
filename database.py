@@ -1,10 +1,10 @@
 import os
+import sys
 import sqlite3
 import hashlib
 import secrets
 from datetime import datetime
 import json
-import pandas as pd
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(BASE_DIR, "sistema_notificaciones.db")
@@ -373,6 +373,7 @@ def init_db():
     cursor.execute("SELECT COUNT(*) as count FROM destinatarios")
     if cursor.fetchone()["count"] == 0 and os.path.exists(EXCEL_PATH):
         try:
+            import pandas as pd
             df = pd.read_excel(EXCEL_PATH)
             df = df.astype(object).fillna("")
             for _, r in df.iterrows():
@@ -656,7 +657,10 @@ def db_actualizar_estado_destinatario(dest_id, estado, fecha=""):
 
 def db_sincronizar_a_excel():
     """Genera/actualiza destinatarios.xlsx para compatibilidad con usuarios que abren Excel."""
+    if sys.platform != "win32":
+        return
     try:
+        import pandas as pd
         conn = get_db_connection()
         df = pd.read_sql_query("SELECT nombre as Nombre, tipo as Tipo, CASE WHEN activo=1 THEN 'SI' ELSE 'NO' END as Activo, automatizaciones as Automatizaciones, estado_envio as Estado_Envio, fecha_envio as Fecha_Envio FROM destinatarios", conn)
         conn.close()
