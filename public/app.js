@@ -419,8 +419,16 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-dest')?.addEventListener('click', () => cerrarModalDestinatario());
   document.getElementById('btn-guardar-destinatario')?.addEventListener('click', guardarDestinatario);
   document.getElementById('wa-contactos-search')?.addEventListener('input', (e) => {
-    waContactosSearch = e.target.value.toLowerCase().trim();
+    waContactosSearch = e.target.value.trim();
     renderListaContactosWA();
+  });
+  document.getElementById('wa-contactos-search')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (typeof window.buscarEnWhatsAppDirecto === 'function') {
+        window.buscarEnWhatsAppDirecto();
+      }
+    }
   });
 
   document.getElementById('btn-nueva-notificacion')?.addEventListener('click', () => abrirModalNotificacion());
@@ -1022,6 +1030,10 @@ function iniciarPollingLogs() {
   }, 3500);
 }
 
+function normalizarTextoBusqueda(txt) {
+  return String(txt || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+}
+
 // ==================== RENDERIZAR TABLA & CHECKLIST ====================
 function renderDestinatarios() {
   const tbody = document.getElementById('tbody-destinatarios');
@@ -1034,9 +1046,12 @@ function renderDestinatarios() {
     searchQuery = '';
   }
 
+  const qNorm = normalizarTextoBusqueda(searchQuery);
   let filtrados = destinatariosData.filter(d => {
-    if (!searchQuery) return true;
-    return (d.nombre || '').toLowerCase().includes(searchQuery);
+    if (!qNorm) return true;
+    const nomNorm = normalizarTextoBusqueda(d.nombre);
+    const tipoNorm = normalizarTextoBusqueda(d.tipo);
+    return nomNorm.includes(qNorm) || tipoNorm.includes(qNorm);
   });
 
   if (filtrados.length === 0) {
@@ -1583,13 +1598,35 @@ window.filtrarTipoContactosWA = function(tipo, shouldRender = true) {
 };
 
 function obtenerContactosWAFiltrados() {
+  const qNorm = normalizarTextoBusqueda(waContactosSearch);
   return (contactosWAData || []).filter(c => {
     if (!c || !c.nombre) return false;
     if (waContactosTipoFilter !== 'todos' && c.tipo !== waContactosTipoFilter) return false;
-    if (waContactosSearch && !c.nombre.toLowerCase().includes(waContactosSearch)) return false;
+    if (qNorm && !normalizarTextoBusqueda(c.nombre).includes(qNorm)) return false;
     return true;
   });
 }
+
+window.usarBusquedaComoNombreManual = function() {
+  const rawSearch = (document.getElementById('wa-contactos-search')?.value || waContactosSearch || '').trim();
+  if (!rawSearch) return;
+  const inputNom = document.getElementById('dest-nombre');
+  const selectTipo = document.getElementById('dest-tipo');
+  if (inputNom) {
+    inputNom.value = rawSearch;
+    inputNom.focus();
+  }
+  if (selectTipo && waContactosTipoFilter !== 'todos') {
+    selectTipo.value = waContactosTipoFilter;
+  }
+  showToast(`"${rawSearch}" copiado al campo Nombre del Destinatario.`, 'info');
+};
+
+window.buscarEnWhatsAppDirecto = function() {
+  const rawSearch = (document.getElementById('wa-contactos-search')?.value || waContactosSearch || '').trim();
+  waContactosSearch = rawSearch;
+  sincronizarContactosWhatsApp(true, rawSearch);
+};
 
 function actualizarResumenSeleccionWA() {
   const summaryBox = document.getElementById('wa-selected-summary');
@@ -1721,13 +1758,21 @@ function renderListaContactosWA() {
         </div>
       `;
     } else {
+      const hasSearchText = Boolean((waContactosSearch || '').trim());
       container.innerHTML = `
-        <div style="padding: 20px 14px; text-align: center; color: #64748b; font-size: 12.5px;">
+        <div style="padding: 18px 14px; text-align: center; color: #64748b; font-size: 12.5px;">
           <div style="font-size: 26px; margin-bottom: 6px;">💬</div>
-          <p style="margin: 0 0 8px 0;">Aún no se han cargado los chats desde tu sesión conectada.</p>
-          <button type="button" onclick="sincronizarContactosWhatsApp(true)" style="background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">
-            🔄 Cargar grupos y contactos de mi WhatsApp ahora
-          </button>
+          <p style="margin: 0 0 10px 0;">${hasSearchText ? `¿Quieres buscar <strong>"${escapeHtml(waContactosSearch)}"</strong> directamente en tu WhatsApp conectado?` : 'Haz clic abajo para extraer todos tus grupos y contactos desde WhatsApp.'}</p>
+          <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" onclick="buscarEnWhatsAppDirecto()" style="background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: 7px 13px; font-size: 12px; font-weight: 600; cursor: pointer;">
+              ${hasSearchText ? `🔍 Buscar "${escapeHtml(waContactosSearch)}" en mi WhatsApp` : '🔄 Cargar grupos y contactos de mi WhatsApp ahora'}
+            </button>
+            ${hasSearchText ? `
+              <button type="button" onclick="usarBusquedaComoNombreManual()" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; padding: 7px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">
+                ✏️ Usar "${escapeHtml(waContactosSearch)}" manualmente
+              </button>
+            ` : ''}
+          </div>
         </div>
       `;
     }
@@ -1735,9 +1780,26 @@ function renderListaContactosWA() {
   }
 
   if (filtrados.length === 0) {
+    const hasSearchText = Boolean((waContactosSearch || '').trim());
     container.innerHTML = syncBannerHtml + `
-      <div style="padding: 18px 12px; text-align: center; color: #94a3b8; font-size: 12.5px;">
-        ${waSyncingInProgress ? 'Esperando que finalice la lectura de tus chats en WhatsApp...' : 'No se encontraron grupos ni contactos con ese filtro.'}
+      <div style="padding: 16px 12px; text-align: center; color: #64748b; font-size: 12.5px;">
+        <p style="margin: 0 0 10px 0; color: #64748b;">
+          ${waSyncingInProgress
+            ? 'Buscando en tus chats y contactos de WhatsApp...'
+            : (hasSearchText
+                ? `No apareció <strong>"${escapeHtml(waContactosSearch)}"</strong> en la lista guardada (${contactosWAData.length} cargados).`
+                : 'No se encontraron grupos ni contactos con ese filtro.')}
+        </p>
+        ${(!waSyncingInProgress && hasSearchText) ? `
+          <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+            <button type="button" onclick="buscarEnWhatsAppDirecto()" style="background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">
+              🔍 Buscar "${escapeHtml(waContactosSearch)}" directo en WhatsApp
+            </button>
+            <button type="button" onclick="usarBusquedaComoNombreManual()" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">
+              ✏️ Usar este nombre manualmente
+            </button>
+          </div>
+        ` : ''}
       </div>
     `;
     return;
@@ -1777,15 +1839,20 @@ function renderListaContactosWA() {
   container.innerHTML = itemsHtml;
 }
 
-window.sincronizarContactosWhatsApp = async function(forceRefresh = false) {
+window.sincronizarContactosWhatsApp = async function(forceRefresh = false, customSearch = '') {
   try {
-    if (forceRefresh) {
+    const cleanQ = String(customSearch || '').trim();
+    if (forceRefresh || cleanQ) {
       waSyncingInProgress = true;
-      waSyncStatusText = 'Conectando con tu sesión de WhatsApp para actualizar la lista...';
+      waSyncStatusText = cleanQ
+        ? `Buscando "${cleanQ}" directamente en tu WhatsApp...`
+        : 'Conectando con tu sesión de WhatsApp para actualizar la lista...';
       renderListaContactosWA();
     }
-    const qParam = forceRefresh ? '&refresh=1' : '';
-    const res = await fetch(getApiEndpoint(`/api/whatsapp/contactos?empresa=${currentEmpresa}${qParam}`));
+    let extraParams = '';
+    if (forceRefresh) extraParams += '&refresh=1';
+    if (cleanQ) extraParams += `&q=${encodeURIComponent(cleanQ)}`;
+    const res = await fetch(getApiEndpoint(`/api/whatsapp/contactos?empresa=${currentEmpresa}${extraParams}`));
     if (!res.ok) return;
     const data = await res.json();
 

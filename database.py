@@ -340,13 +340,17 @@ def init_db():
         cursor.execute("UPDATE usuarios SET password_plain = 'admin123' WHERE username = 'admin' AND (password_plain IS NULL OR password_plain = '')")
         conn.commit()
 
-    cursor.execute("SELECT id FROM usuarios WHERE username = 'operador1'")
-    if not cursor.fetchone():
+    cursor.execute("SELECT id, password_plain FROM usuarios WHERE username = 'operador1'")
+    row_op = cursor.fetchone()
+    if not row_op:
         op_hash = hash_password("password456")
         cursor.execute(
             "INSERT INTO usuarios (username, password_hash, nombre, rol, creado_en, password_plain) VALUES (?, ?, ?, ?, ?, ?)",
             ("operador1", op_hash, "Operador Uno", "operador", datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "password456")
         )
+        conn.commit()
+    elif not row_op["password_plain"]:
+        cursor.execute("UPDATE usuarios SET password_plain = 'password456' WHERE username = 'operador1' AND (password_plain IS NULL OR password_plain = '')")
         conn.commit()
 
     # Configuración por defecto

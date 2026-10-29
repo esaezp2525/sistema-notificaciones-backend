@@ -366,43 +366,80 @@ def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío", empres
                 add_log("info", f"[{automation_state['procesados']}/{total}] Buscando {tipo_dest.lower()}: '{nombre_dest}'...")
 
                 try:
-                    # 1. Localizar caja de búsqueda
-                    search_box = page.locator("input[data-tab='3'], input[role='textbox'], #side input, div[contenteditable='true'][data-tab='3']").first
+                    # 1. Localizar caja de búsqueda y escribir con soporte completo para editor Lexical de WhatsApp Web
+                    search_box = page.locator(
+                        "div[contenteditable='true'][data-tab='3'], "
+                        "div[aria-label*='búsqueda'], "
+                        "div[aria-label*='Search'], "
+                        "div[role='textbox'][data-tab='3'], "
+                        "input[data-tab='3'], "
+                        "input[role='textbox'], "
+                        "#side div[contenteditable='true'], "
+                        "#side input"
+                    ).first
                     search_box.click(timeout=8000)
-                    time.sleep(0.3)
-                    search_box.fill("")
+                    time.sleep(0.25)
+                    page.keyboard.press("Control+A")
+                    page.keyboard.press("Backspace")
                     time.sleep(0.2)
-                    search_box.fill(nombre_dest)
-                    time.sleep(1.8)
+                    page.keyboard.insert_text(nombre_dest)
+                    time.sleep(2.2)
 
-                    # 2. Localizar chat en la lista de resultados
-                    keyword = re.sub(r'[^\w\s]', '', nombre_dest).strip()
-                    selectores = [
-                        f"#pane-side div[data-testid='cell-frame-container']:has-text('{nombre_dest}')",
-                        f"#pane-side span[title*='{nombre_dest}']",
-                    ]
-                    if keyword and keyword != nombre_dest:
-                        selectores.append(f"#pane-side div[data-testid='cell-frame-container']:has-text('{keyword}')")
-                        selectores.append(f"#pane-side span[title*='{keyword}']")
-                    selectores.append("#pane-side div[data-testid='cell-frame-container']")
+                    # 2. Localizar y hacer clic en el chat o grupo dentro de #pane-side (insensible a mayúsculas y tildes)
+                    clicked = page.evaluate("""(targetName) => {
+                        const norm = (s) => (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+                        const target = norm(targetName);
+                        if (!target) return false;
 
-                    chat_encontrado = None
-                    for sel in selectores:
-                        loc = page.locator(sel)
-                        if loc.count() > 0 and loc.first.is_visible():
-                            chat_encontrado = loc.first
-                            break
+                        const pane = document.querySelector('#pane-side') || document;
+                        const candidates = Array.from(pane.querySelectorAll(
+                            "span[title], span[dir='auto'], div[role='listitem'], div[role='row'], div[data-testid='cell-frame-container']"
+                        ));
 
-                    if not chat_encontrado:
-                        add_log("error", f"❌ '{nombre_dest}' no fue encontrado en WhatsApp.")
-                        database.db_actualizar_estado_destinatario(dest_id, "No Encontrado")
-                        automation_state["fallidos"] += 1
-                        page.keyboard.press("Escape")
-                        time.sleep(1)
-                        continue
+                        // 1° Coincidencia exacta por atributo title o texto
+                        for (const el of candidates) {
+                            const tAttr = norm(el.getAttribute && el.getAttribute('title'));
+                            if (tAttr && tAttr === target) {
+                                const row = el.closest("[role='listitem'], [role='row'], [data-testid='cell-frame-container']") || el;
+                                row.click();
+                                return true;
+                            }
+                        }
+                        // 2° Coincidencia parcial por atributo title
+                        for (const el of candidates) {
+                            const tAttr = norm(el.getAttribute && el.getAttribute('title'));
+                            if (tAttr && (tAttr.includes(target) || target.includes(tAttr)) && tAttr.length >= 2) {
+                                const row = el.closest("[role='listitem'], [role='row'], [data-testid='cell-frame-container']") || el;
+                                row.click();
+                                return true;
+                            }
+                        }
+                        // 3° Coincidencia por texto visible dentro de las filas de resultados
+                        const rows = Array.from(pane.querySelectorAll("[role='listitem'], [role='row'], [data-testid='cell-frame-container']"));
+                        for (const r of rows) {
+                            const txt = norm(r.innerText || '');
+                            if (txt && txt.includes(target)) {
+                                r.click();
+                                return true;
+                            }
+                        }
+                        return false;
+                    }""", nombre_dest)
 
-                    chat_encontrado.click(timeout=8000)
-                    time.sleep(1.5)
+                    if not clicked:
+                        # Intentar presionar Enter en la caja de búsqueda por si WhatsApp seleccionó el primer resultado
+                        page.keyboard.press("Enter")
+                        time.sleep(1.2)
+                        has_footer = page.locator("footer div[contenteditable='true'], footer div[role='textbox']").count() > 0
+                        if not has_footer:
+                            add_log("error", f"❌ '{nombre_dest}' no fue encontrado en WhatsApp.")
+                            database.db_actualizar_estado_destinatario(dest_id, "No Encontrado")
+                            automation_state["fallidos"] += 1
+                            page.keyboard.press("Escape")
+                            time.sleep(1)
+                            continue
+                    else:
+                        time.sleep(1.5)
 
                     # 3. Preparar mensaje con variables
                     ahora_dt = datetime.now()
@@ -587,7 +624,7 @@ def auth_cambiar_clave():
     uid = session.get("user_id") or data.get("user_id")
     username = str(data.get("username") or session.get("username") or "").strip()
     clave_actual = str(data.get("clave_actual", ""))
-    nueva_clave = str(data.get("nueva_clave", ""))
+    nueva_clave = str(data.get("nueva_clave") or data.get("clave_nueva") or "")
 
     if not uid and not username:
         return jsonify({"success": False, "error": "No autorizado"}), 401
@@ -656,9 +693,9 @@ def eliminar_usuario():
 @app.route("/api/usuarios/cambiar-clave-admin", methods=["POST"])
 def cambiar_clave_admin():
     data = request.get_json(silent=True) or {}
-    user_id = data.get("id")
+    user_id = data.get("id") or data.get("user_id")
     username = data.get("username")
-    nueva_clave = data.get("nueva_clave", "")
+    nueva_clave = data.get("nueva_clave") or data.get("clave_nueva") or ""
 
     ok, msg = database.cambiar_clave_usuario(user_id, nueva_clave, username=username)
     if ok:
@@ -1009,21 +1046,58 @@ def detener_envio():
 
 # ---------- EXTRACCIÓN Y SINCRONIZACIÓN DE CONTACTOS Y GRUPOS DE WHATSAPP ----------
 wa_contactos_sync_state = {
-    "contidep": {"is_syncing": False, "status_text": "", "last_sync": 0},
-    "medcapital": {"is_syncing": False, "status_text": "", "last_sync": 0}
+    "contidep": {"is_syncing": False, "status_text": "", "last_sync": 0, "last_attempt": 0, "pending_query": ""},
+    "medcapital": {"is_syncing": False, "status_text": "", "last_sync": 0, "last_attempt": 0, "pending_query": ""}
 }
 
-def extraer_contactos_en_pagina(page):
-    """Extrae grupos y contactos disponibles desde IndexedDB (model-storage) y el DOM (#pane-side) de WhatsApp Web."""
+def ejecutar_busqueda_en_barra_wa(page, query_text):
+    """Escribe un término en el buscador interno de WhatsApp Web, extrae los resultados y limpia el filtro."""
+    q = str(query_text or "").strip()
+    if not q:
+        return []
     try:
-        raw_items = page.evaluate("""async () => {
+        search_box = page.locator(
+            "div[contenteditable='true'][data-tab='3'], "
+            "div[aria-label*='búsqueda'], "
+            "div[aria-label*='Search'], "
+            "div[role='textbox'][data-tab='3'], "
+            "input[data-tab='3'], "
+            "input[role='textbox'], "
+            "#side div[contenteditable='true'], "
+            "#side input"
+        ).first
+        search_box.click(timeout=6000)
+        time.sleep(0.2)
+        page.keyboard.press("Control+A")
+        page.keyboard.press("Backspace")
+        time.sleep(0.15)
+        page.keyboard.insert_text(q)
+        time.sleep(2.2)
+        resultados = extraer_contactos_en_pagina(page, skip_scroll=True, skip_idb=True)
+        try:
+            page.keyboard.press("Escape")
+            time.sleep(0.3)
+        except Exception:
+            pass
+        return resultados
+    except Exception as e:
+        print(f"[WA Search] Error buscando '{q}' en WhatsApp Web: {e}")
+        return []
+
+def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
+    """Extrae grupos y contactos disponibles desde el DOM (#pane-side / #side) e IndexedDB (solo cuando #pane-side ya cargó)."""
+    try:
+        raw_items = page.evaluate("""async (opts) => {
+            const skipScroll = Boolean(opts && opts.skipScroll);
+            const skipIdb = Boolean(opts && opts.skipIdb);
             const seen = new Map();
             const ignoreExact = new Set([
                 'archivados', 'archived', 'restringidos', 'locked chats', 'mensajes destacados',
                 'starred messages', 'whatsapp', 'conectando...', 'cargando tus chats...',
                 'loading your chats...', 'busca un chat o inicia uno nuevo', 'buscar o empezar un chat nuevo',
                 'search or start new chat', 'todos', 'no leídos', 'favoritos', 'grupos', 'contactos',
-                'estados', 'canales', 'comunidades', 'tú', 'tu (tú)'
+                'estados', 'canales', 'comunidades', 'tú', 'tu (tú)', 'chats', 'mensajes',
+                'no se encontraron resultados', 'nuevo chat', 'nuevo grupo', 'nueva comunidad'
             ]);
             const groupKeywords = [
                 'grupo', 'contabilidad', 'contidep', 'medcapital', 'clientes', 'facturación', 'facturacion',
@@ -1036,13 +1110,14 @@ def extraer_contactos_en_pagina(page):
             function isNoise(name) {
                 if (!name || typeof name !== 'string') return true;
                 const clean = name.trim();
-                if (clean.length < 2 || clean.length > 100) return true;
+                if (clean.length < 2 || clean.length > 95) return true;
                 const low = clean.toLowerCase();
                 if (ignoreExact.has(low)) return true;
                 if (low.includes('@c.us') || low.includes('@g.us') || low.includes('@lid') || low.includes('@broadcast') || low.includes('@newsletter')) return true;
                 if (/^\\d{1,2}:\\d{2}(\\s*[ap]\\.?\\s*m\\.?)?$/i.test(clean)) return true;
                 if (/^(ayer|hoy|lunes|martes|miércoles|miercoles|jueves|viernes|sábado|sabado|domingo)$/i.test(clean)) return true;
-                if (/^\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}$/.test(clean)) return true;
+                if (/^\\d{1,2}[\\/\\-]\\d{1,2}[\\/\\-]\\d{2,4}$/.test(clean)) return true;
+                if (low.startsWith('cifrado de extremo') || low.startsWith('end-to-end encrypted')) return true;
                 return false;
             }
 
@@ -1067,136 +1142,183 @@ def extraer_contactos_en_pagina(page):
                 }
             }
 
-            // 1. Leer desde IndexedDB (model-storage: group-metadata, chat, contact)
-            try {
-                const db = await new Promise((resolve) => {
-                    try {
-                        const req = indexedDB.open('model-storage');
-                        req.onsuccess = () => resolve(req.result);
-                        req.onerror = () => resolve(null);
-                        req.onblocked = () => resolve(null);
-                        setTimeout(() => resolve(null), 3500);
-                    } catch (e) {
-                        resolve(null);
-                    }
-                });
-                if (db) {
-                    const stores = Array.from(db.objectStoreNames || []);
-                    const readAll = (sName) => new Promise((res) => {
-                        if (!stores.includes(sName)) return res([]);
-                        try {
-                            const tx = db.transaction(sName, 'readonly');
-                            const st = tx.objectStore(sName);
-                            const rq = st.getAll();
-                            rq.onsuccess = () => res(rq.result || []);
-                            rq.onerror = () => res([]);
-                        } catch (e) {
-                            res([]);
+            // 1. Leer desde el DOM (#pane-side y contenedores laterales)
+            const extractFromContainer = (rootEl) => {
+                if (!rootEl) return;
+                const rows = rootEl.querySelectorAll("[role='listitem'], [role='row'], div[data-testid='cell-frame-container']");
+                if (rows.length > 0) {
+                    rows.forEach(row => {
+                        const hasGroupIcon = Boolean(row.querySelector("span[data-icon*='group'], span[data-icon*='community'], span[data-icon*='default-group']"));
+                        const rowText = (row.innerText || '');
+                        const hasMultiSender = /\\n~?[^:\\n]{1,28}:\\s/.test(rowText);
+                        const isGrp = hasGroupIcon || hasMultiSender;
+
+                        const titleSpans = row.querySelectorAll("span[dir='auto'][title], span[title]");
+                        let foundInRow = false;
+                        for (const sp of titleSpans) {
+                            const t = (sp.getAttribute('title') || '').trim();
+                            if (!isNoise(t)) {
+                                addItem(t, guessType(t, isGrp));
+                                foundInRow = true;
+                                break;
+                            }
+                        }
+                        if (!foundInRow) {
+                            const autoSpans = row.querySelectorAll("span[dir='auto']");
+                            for (const sp of autoSpans) {
+                                const txt = (sp.innerText || sp.textContent || '').trim();
+                                if (!isNoise(txt)) {
+                                    addItem(txt, guessType(txt, isGrp));
+                                    break;
+                                }
+                            }
                         }
                     });
-
-                    const [groupsMeta, chats, contacts] = await Promise.all([
-                        readAll('group-metadata'),
-                        readAll('chat'),
-                        readAll('contact')
-                    ]);
-                    try { db.close(); } catch (e) {}
-
-                    const idNameMap = new Map();
-                    for (const g of groupsMeta) {
-                        const gid = String(g.id || '');
-                        const subj = String(g.subject || g.name || '').trim();
-                        if (subj) {
-                            idNameMap.set(gid, { name: subj, isGroup: true });
-                            addItem(subj, 'Grupo');
-                        }
-                    }
-                    for (const c of contacts) {
-                        const cid = String(c.id || '');
-                        if (cid.includes('status@broadcast') || cid.includes('@newsletter')) continue;
-                        const isGrp = cid.includes('@g.us') || Boolean(c.isGroup);
-                        const cName = String(c.name || c.verifiedName || c.shortName || (isGrp ? c.pushname : '') || '').trim();
-                        if (cName) {
-                            idNameMap.set(cid, { name: cName, isGroup: isGrp });
-                            if (c.name || isGrp || c.isAddressBookContact || c.isWAContact) {
-                                addItem(cName, isGrp ? 'Grupo' : guessType(cName, false));
-                            }
-                        }
-                    }
-                    for (const ch of chats) {
-                        const chId = String(ch.id || '');
-                        if (chId.includes('status@broadcast') || chId.includes('@newsletter')) continue;
-                        const isGrp = chId.includes('@g.us') || Boolean(ch.isGroup);
-                        const mapped = idNameMap.get(chId);
-                        const chName = String(ch.name || ch.formattedTitle || ch.subject || ch.title || (mapped ? mapped.name : '') || '').trim();
-                        if (chName) {
-                            addItem(chName, isGrp ? 'Grupo' : guessType(chName, false));
-                        }
-                    }
+                } else {
+                    rootEl.querySelectorAll("span[dir='auto'][title], span[title]").forEach(sp => {
+                        const t = (sp.getAttribute('title') || '').trim();
+                        addItem(t, guessType(t, false));
+                    });
                 }
-            } catch (e) {}
+            };
 
-            // 2. Leer desde el DOM (#pane-side) y hacer scroll suave para cargar filas virtualizadas
             try {
-                const pane = document.querySelector('#pane-side');
-                const extractVisibleRows = () => {
-                    const rows = document.querySelectorAll("#pane-side [role='listitem'], #pane-side [role='row'], #pane-side div[data-testid='cell-frame-container']");
-                    if (rows.length > 0) {
-                        rows.forEach(row => {
-                            const titleSpans = row.querySelectorAll("span[dir='auto'][title], span[title]");
-                            if (titleSpans.length > 0) {
-                                const firstTitle = titleSpans[0].getAttribute('title') || '';
-                                const hasGroupIcon = Boolean(row.querySelector("span[data-icon*='group'], span[data-icon*='community'], span[data-icon*='default-group']"));
-                                const rowText = (row.innerText || '');
-                                const hasMultiSender = /\\n~?[^:\\n]{1,28}:\\s/.test(rowText);
-                                addItem(firstTitle, guessType(firstTitle, hasGroupIcon || hasMultiSender));
-                            }
-                        });
-                    } else {
-                        document.querySelectorAll("#pane-side span[dir='auto'][title], #pane-side span[title]").forEach(sp => {
-                            const t = sp.getAttribute('title') || '';
-                            addItem(t, guessType(t, false));
-                        });
-                    }
-                };
-
-                extractVisibleRows();
-                if (pane && pane.scrollHeight > pane.clientHeight) {
+                const pane = document.querySelector('#pane-side') || document.querySelector('#side');
+                extractFromContainer(pane);
+                if (!skipScroll && pane && pane.scrollHeight > pane.clientHeight) {
                     const origScroll = pane.scrollTop;
-                    for (let i = 0; i < 6; i++) {
+                    for (let i = 0; i < 8; i++) {
                         pane.scrollTop += 520;
-                        await new Promise(r => setTimeout(r, 170));
-                        extractVisibleRows();
+                        await new Promise(r => setTimeout(r, 180));
+                        extractFromContainer(pane);
                         if (pane.scrollTop + pane.clientHeight >= pane.scrollHeight - 20) break;
                     }
                     pane.scrollTop = origScroll;
                 }
             } catch (e) {}
 
+            // 2. Leer desde IndexedDB (model-storage) SOLO si ya existe la BD y #pane-side está montado
+            if (!skipIdb && document.querySelector('#pane-side, #side')) {
+                try {
+                    let modelDbExists = true;
+                    if (window.indexedDB && typeof indexedDB.databases === 'function') {
+                        const dbs = await indexedDB.databases();
+                        modelDbExists = dbs.some(d => d && d.name === 'model-storage');
+                    }
+                    if (modelDbExists) {
+                        const db = await new Promise((resolve) => {
+                            try {
+                                const req = indexedDB.open('model-storage');
+                                req.onupgradeneeded = (ev) => {
+                                    try { ev.target.transaction.abort(); } catch (e) {}
+                                    resolve(null);
+                                };
+                                req.onsuccess = () => resolve(req.result);
+                                req.onerror = () => resolve(null);
+                                req.onblocked = () => resolve(null);
+                                setTimeout(() => resolve(null), 2800);
+                            } catch (e) {
+                                resolve(null);
+                            }
+                        });
+                        if (db) {
+                            const stores = Array.from(db.objectStoreNames || []);
+                            const readAll = (sName) => new Promise((res) => {
+                                if (!stores.includes(sName)) return res([]);
+                                try {
+                                    const tx = db.transaction(sName, 'readonly');
+                                    const st = tx.objectStore(sName);
+                                    const rq = st.getAll();
+                                    rq.onsuccess = () => res(rq.result || []);
+                                    rq.onerror = () => res([]);
+                                } catch (e) {
+                                    res([]);
+                                }
+                            });
+
+                            const [groupsMeta, chats, contacts] = await Promise.all([
+                                readAll('group-metadata'),
+                                readAll('chat'),
+                                readAll('contact')
+                            ]);
+                            try { db.close(); } catch (e) {}
+
+                            const idNameMap = new Map();
+                            for (const g of groupsMeta) {
+                                const gid = String(g.id || '');
+                                const subj = String(g.subject || g.name || '').trim();
+                                if (subj) {
+                                    idNameMap.set(gid, { name: subj, isGroup: true });
+                                    addItem(subj, 'Grupo');
+                                }
+                            }
+                            for (const c of contacts) {
+                                const cid = String(c.id || '');
+                                if (cid.includes('status@broadcast') || cid.includes('@newsletter')) continue;
+                                const isGrp = cid.includes('@g.us') || Boolean(c.isGroup);
+                                const cName = String(c.name || c.verifiedName || c.shortName || c.pushname || '').trim();
+                                if (cName) {
+                                    idNameMap.set(cid, { name: cName, isGroup: isGrp });
+                                    if (c.name || isGrp || c.isAddressBookContact || c.isWAContact || c.pushname) {
+                                        addItem(cName, isGrp ? 'Grupo' : guessType(cName, false));
+                                    }
+                                }
+                            }
+                            for (const ch of chats) {
+                                const chId = String(ch.id || '');
+                                if (chId.includes('status@broadcast') || chId.includes('@newsletter')) continue;
+                                const isGrp = chId.includes('@g.us') || Boolean(ch.isGroup);
+                                const mapped = idNameMap.get(chId);
+                                const chName = String(ch.name || ch.formattedTitle || ch.subject || ch.title || (mapped ? mapped.name : '') || '').trim();
+                                if (chName) {
+                                    addItem(chName, isGrp ? 'Grupo' : guessType(chName, false));
+                                }
+                            }
+                        }
+                    }
+                } catch (e) {}
+            }
+
             return Array.from(seen.values());
-        }""")
+        }""", {"skipScroll": skip_scroll, "skipIdb": skip_idb})
         if isinstance(raw_items, list):
             return raw_items
     except Exception as e:
         print(f"[WA Extract] Error extrayendo contactos: {e}")
     return []
 
-def extraer_y_guardar_contactos_wa(page, empresa_id="contidep"):
+def extraer_y_guardar_contactos_wa(page, empresa_id="contidep", search_query=None):
     safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     detectados = extraer_contactos_en_pagina(page)
+    if search_query:
+        buscados = ejecutar_busqueda_en_barra_wa(page, search_query)
+        if buscados:
+            detectados.extend(buscados)
+    pending_q = wa_contactos_sync_state[safe_empresa].get("pending_query", "")
+    if pending_q and pending_q != search_query:
+        wa_contactos_sync_state[safe_empresa]["pending_query"] = ""
+        buscados_p = ejecutar_busqueda_en_barra_wa(page, pending_q)
+        if buscados_p:
+            detectados.extend(buscados_p)
     if detectados:
         database.db_guardar_contactos_wa(detectados, empresa_id=safe_empresa, replace_all=False)
         wa_contactos_sync_state[safe_empresa]["last_sync"] = time.time()
-    return detectados
+    return database.db_obtener_contactos_wa(empresa_id=safe_empresa)
 
-def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatarios=False):
+def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatarios=False, search_query=None):
     safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     global whatsapp_autenticado
     if wa_contactos_sync_state[safe_empresa]["is_syncing"]:
+        if search_query:
+            wa_contactos_sync_state[safe_empresa]["pending_query"] = str(search_query).strip()
         return
 
     wa_contactos_sync_state[safe_empresa]["is_syncing"] = True
-    wa_contactos_sync_state[safe_empresa]["status_text"] = f"Consultando grupos y contactos de WhatsApp ({safe_empresa.title()})..."
+    wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
+    wa_contactos_sync_state[safe_empresa]["status_text"] = (
+        f"Buscando '{search_query}' en WhatsApp ({safe_empresa.title()})..."
+        if search_query else f"Cargando lista de grupos y contactos de WhatsApp ({safe_empresa.title()})..."
+    )
     closed_cleanly = False
 
     with playwright_browser_lock:
@@ -1229,25 +1351,51 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
 
                 detectados = []
                 start_wait = time.time()
-                while time.time() - start_wait < 38:
-                    # Verificar si apareció QR (sesión expirada)
-                    has_qr = page.evaluate("""() => {
-                        const c = document.querySelector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas");
-                        return Boolean(c && c.width >= 80);
+                qr_seen_count = 0
+                # Esperar primero a que #pane-side o #side aparezca en el DOM SIN bloquear IndexedDB
+                while time.time() - start_wait < 75:
+                    wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
+                    dom_state = page.evaluate("""() => {
+                        // Cerrar modales tipo 'Continuar' / 'Aceptar'
+                        const allBtns = document.querySelectorAll("button, div[role='button']");
+                        for (const b of allBtns) {
+                            const txt = (b.innerText || "").trim().toLowerCase();
+                            if (txt === "continuar" || txt === "continue" || txt === "aceptar" || txt === "ok" || txt === "entendido") {
+                                try { b.click(); } catch (e) {}
+                            }
+                        }
+                        if (document.querySelector("#pane-side, #side, [data-testid='chat-list']")) {
+                            return 'ready';
+                        }
+                        const c = document.querySelector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas, canvas");
+                        if (c && c.width >= 80 && c.height >= 80) {
+                            return 'qr';
+                        }
+                        return 'loading';
                     }""")
-                    if has_qr:
-                        set_empresa_autenticada(safe_empresa, False)
-                        wa_contactos_sync_state[safe_empresa]["status_text"] = "La sesión de WhatsApp requiere volver a vincular el QR."
+
+                    if dom_state == "qr":
+                        qr_seen_count += 1
+                        if qr_seen_count >= 3:
+                            set_empresa_autenticada(safe_empresa, False)
+                            wa_contactos_sync_state[safe_empresa]["status_text"] = "La sesión de WhatsApp expiró. Por favor vuelve a vincular el QR."
+                            add_log("warning", f"[{safe_empresa.title()}] La sesión de WhatsApp requiere escanear el código QR nuevamente.")
+                            break
+                    elif dom_state == "ready":
+                        set_empresa_autenticada(safe_empresa, True)
+                        wa_contactos_sync_state[safe_empresa]["status_text"] = (
+                            f"Buscando '{search_query}' en tus chats de WhatsApp..."
+                            if search_query else f"Extrayendo grupos y contactos de {safe_empresa.title()}..."
+                        )
+                        time.sleep(2.8)
+                        detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=search_query)
+                        if len(detectados) == 0:
+                            time.sleep(3.0)
+                            detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=search_query)
                         break
 
-                    detectados = extraer_y_guardar_contactos_wa(page, safe_empresa)
-                    has_pane = page.evaluate("() => Boolean(document.querySelector('#pane-side'))")
-                    if has_pane and len(detectados) > 0:
-                        set_empresa_autenticada(safe_empresa, True)
-                        break
-                    elif len(detectados) >= 5 and (time.time() - start_wait) >= 8:
-                        set_empresa_autenticada(safe_empresa, True)
-                        break
+                    elapsed = int(time.time() - start_wait)
+                    wa_contactos_sync_state[safe_empresa]["status_text"] = f"Abriendo tus chats de WhatsApp ({safe_empresa.title()})... ({elapsed}s)"
                     time.sleep(2.0)
 
                 if importar_a_destinatarios and detectados:
@@ -1274,6 +1422,7 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
             add_log("error", f"[{safe_empresa.title()}] Error al sincronizar lista de WhatsApp: {e}")
         finally:
             wa_contactos_sync_state[safe_empresa]["is_syncing"] = False
+            wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
             wa_contactos_sync_state[safe_empresa]["status_text"] = ""
             if not closed_cleanly:
                 forzar_cierre_playwright()
@@ -1284,16 +1433,23 @@ def api_whatsapp_contactos():
     empresa = request.args.get("empresa") or data.get("empresa", "contidep")
     safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
     refresh = request.args.get("refresh", "0") in ("1", "true") or bool(data.get("refresh", False))
+    search_query = str(request.args.get("q") or data.get("q") or "").strip()
 
     contactos = database.db_obtener_contactos_wa(empresa_id=safe_empresa)
     is_auth = bool(whatsapp_autenticado.get(safe_empresa, False))
     is_syncing = bool(wa_contactos_sync_state[safe_empresa]["is_syncing"])
+    last_attempt = wa_contactos_sync_state[safe_empresa].get("last_attempt", 0)
+    cooldown_passed = (time.time() - last_attempt) > 90
 
-    # Si está autenticado y pide refresh o aún no hay contactos en caché, disparar sincronización en segundo plano
-    if is_auth and (refresh or len(contactos) == 0) and not is_syncing and not qr_state[safe_empresa]["is_active"] and not automation_state["is_running"]:
+    if search_query and is_syncing:
+        wa_contactos_sync_state[safe_empresa]["pending_query"] = search_query
+
+    # Disparar sincronización si pide refresh, si busca en vivo (q), o si no hay contactos y pasó el cooldown
+    should_start = refresh or bool(search_query) or (len(contactos) == 0 and cooldown_passed)
+    if is_auth and should_start and not is_syncing and not qr_state[safe_empresa]["is_active"] and not automation_state["is_running"]:
         t = threading.Thread(
             target=sincronizar_contactos_wa_worker,
-            kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": False},
+            kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": False, "search_query": search_query or None},
             daemon=True
         )
         t.start()
@@ -1320,10 +1476,11 @@ def escanear_whatsapp():
     empresa = request.args.get("empresa") or data.get("empresa", "contidep")
     safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
     importar = bool(data.get("importar", False))
+    search_query = str(data.get("q") or "").strip() or None
 
     t = threading.Thread(
         target=sincronizar_contactos_wa_worker,
-        kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": importar},
+        kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": importar, "search_query": search_query},
         daemon=True
     )
     t.start()
@@ -1527,6 +1684,7 @@ def qr_worker(empresa_id="contidep", run_id=0):
                     if state == "authenticated":
                         set_empresa_autenticada(safe_empresa, True)
                         wa_contactos_sync_state[safe_empresa]["is_syncing"] = True
+                        wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
                         wa_contactos_sync_state[safe_empresa]["status_text"] = f"Sincronizando tus grupos y contactos de {safe_empresa.title()}..."
                         with qr_lock:
                             if qr_global_run_id == run_id:
@@ -1535,23 +1693,50 @@ def qr_worker(empresa_id="contidep", run_id=0):
                                 qr_state[safe_empresa]["qr_base64"] = None
                                 qr_state[safe_empresa]["is_active"] = False
                         add_log("success", f"✅ WhatsApp Web [{safe_empresa.title()}] vinculado y conectado exitosamente.")
-                        # Mientras persiste IndexedDB en disco, extraer automáticamente los grupos y contactos disponibles
+                        # Esperar en segundo plano a que WhatsApp Web descargue la lista de chats (#pane-side) antes de leer IndexedDB y cerrar
                         try:
                             total_extraidos = 0
-                            for _ in range(7):
-                                time.sleep(2.2)
-                                det = extraer_y_guardar_contactos_wa(page, safe_empresa)
-                                if len(det) > total_extraidos:
-                                    total_extraidos = len(det)
-                                has_pane = page.evaluate("() => Boolean(document.querySelector('#pane-side'))")
-                                if has_pane and total_extraidos > 0:
+                            pane_wait_start = time.time()
+                            has_pane = False
+                            while time.time() - pane_wait_start < 90:
+                                if qr_global_run_id != run_id or automation_status["is_running"]:
                                     break
+                                try:
+                                    has_pane = page.evaluate("() => Boolean(document.querySelector('#pane-side, #side, [data-testid=\"chat-list\"]'))")
+                                except Exception:
+                                    has_pane = False
+                                if has_pane:
+                                    break
+                                elapsed_sync = int(time.time() - pane_wait_start)
+                                wa_contactos_sync_state[safe_empresa]["status_text"] = f"Descargando historial inicial de WhatsApp ({safe_empresa.title()})... ({elapsed_sync}s)"
+                                time.sleep(2.0)
+
+                            if has_pane and qr_global_run_id == run_id and not automation_status["is_running"]:
+                                wa_contactos_sync_state[safe_empresa]["status_text"] = f"Extrayendo grupos y contactos de {safe_empresa.title()}..."
+                                time.sleep(3.0)
+                                det = extraer_y_guardar_contactos_wa(page, safe_empresa)
+                                total_extraidos = len(det)
+                                for step in range(8):
+                                    if qr_global_run_id != run_id or automation_status["is_running"]:
+                                        break
+                                    try:
+                                        page.evaluate("""(s) => {
+                                            const p = document.querySelector('#pane-side');
+                                            if (p) p.scrollTop = s * 550;
+                                        }""", step + 1)
+                                    except Exception:
+                                        pass
+                                    time.sleep(0.55)
+                                    det = extraer_y_guardar_contactos_wa(page, safe_empresa)
+                                    if len(det) > total_extraidos:
+                                        total_extraidos = len(det)
                             if total_extraidos > 0:
                                 add_log("success", f"📋 [{safe_empresa.title()}] {total_extraidos} grupos y contactos sincronizados desde WhatsApp.")
                         except Exception:
                             pass
                         finally:
                             wa_contactos_sync_state[safe_empresa]["is_syncing"] = False
+                            wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
                             wa_contactos_sync_state[safe_empresa]["status_text"] = ""
                         break
 

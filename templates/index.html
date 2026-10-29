@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=22">
+  <link rel="stylesheet" href="/style.css?v=23">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -473,7 +473,10 @@
           <!-- Buscador y Filtros de Lista WhatsApp -->
           <div id="wa-list-controls" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
             <div style="display: flex; gap: 6px; align-items: center;">
-              <input type="search" id="wa-contactos-search" class="form-input" placeholder="🔍 Filtrar grupo o contacto de tu WhatsApp..." style="padding: 6px 10px; font-size: 12.5px; flex: 1;">
+              <input type="search" id="wa-contactos-search" class="form-input" placeholder="🔍 Escribe el nombre del grupo o persona..." style="padding: 6px 10px; font-size: 12.5px; flex: 1;">
+              <button type="button" id="btn-buscar-wa-directo" onclick="buscarEnWhatsAppDirecto()" title="Buscar este nombre directamente dentro de tu WhatsApp conectado" style="background: #16a34a; color: #ffffff; border: 1px solid #15803d; border-radius: 6px; padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                🔍 Buscar en WA
+              </button>
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;">
               <div style="display: flex; gap: 4px;" id="wa-contactos-filter-tabs">
@@ -933,6 +936,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=22"></script>
+  <script src="/app.js?v=23"></script>
 </body>
 </html>
