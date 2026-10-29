@@ -229,12 +229,10 @@ def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None, lightweight
                     "--no-default-browser-check",
                     "--renderer-process-limit=1",
                     "--blink-settings=imagesEnabled=false",
-                    "--disk-cache-size=1",
+                    "--disk-cache-size=67108864",
                     "--media-cache-size=1",
-                    "--aggressive-cache-discard",
-                    "--disable-application-cache",
                     "--disable-notifications",
-                    "--js-flags=--max-old-space-size=160 --optimize-for-size",
+                    "--js-flags=--max-old-space-size=256",
                     f"--window-size={vw},{vh}"
                 ],
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -1067,16 +1065,16 @@ def ejecutar_busqueda_en_barra_wa(page, query_text):
             "#side input"
         ).first
         search_box.click(timeout=6000)
-        time.sleep(0.2)
+        page.wait_for_timeout(200)
         page.keyboard.press("Control+A")
         page.keyboard.press("Backspace")
-        time.sleep(0.15)
+        page.wait_for_timeout(150)
         page.keyboard.insert_text(q)
-        time.sleep(2.2)
+        page.wait_for_timeout(2200)
         resultados = extraer_contactos_en_pagina(page, skip_scroll=True, skip_idb=True)
         try:
             page.keyboard.press("Escape")
-            time.sleep(0.3)
+            page.wait_for_timeout(300)
         except Exception:
             pass
         return resultados
@@ -1145,47 +1143,57 @@ def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
             // 1. Leer desde el DOM (#pane-side y contenedores laterales)
             const extractFromContainer = (rootEl) => {
                 if (!rootEl) return;
-                const rows = rootEl.querySelectorAll("[role='listitem'], [role='row'], div[data-testid='cell-frame-container']");
-                if (rows.length > 0) {
-                    rows.forEach(row => {
-                        const hasGroupIcon = Boolean(row.querySelector("span[data-icon*='group'], span[data-icon*='community'], span[data-icon*='default-group']"));
-                        const rowText = (row.innerText || '');
-                        const hasMultiSender = /\\n~?[^:\\n]{1,28}:\\s/.test(rowText);
-                        const isGrp = hasGroupIcon || hasMultiSender;
+                const rows = rootEl.querySelectorAll("[role='listitem'], [role='row'], div[data-testid='cell-frame-container'], div[tabindex='-1']");
+                const processedRows = new Set();
+                rows.forEach(row => {
+                    processedRows.add(row);
+                    const hasGroupIcon = Boolean(row.querySelector("span[data-icon*='group'], span[data-icon*='community'], span[data-icon*='default-group']"));
+                    const rowText = (row.innerText || '');
+                    const hasMultiSender = /\\n~?[^:\\n]{1,28}:\\s/.test(rowText);
+                    const isGrp = hasGroupIcon || hasMultiSender;
 
-                        const titleSpans = row.querySelectorAll("span[dir='auto'][title], span[title]");
-                        let foundInRow = false;
-                        for (const sp of titleSpans) {
-                            const t = (sp.getAttribute('title') || '').trim();
-                            if (!isNoise(t)) {
-                                addItem(t, guessType(t, isGrp));
-                                foundInRow = true;
+                    const titleSpans = row.querySelectorAll("span[dir='auto'][title], span[title]");
+                    let foundInRow = false;
+                    for (const sp of titleSpans) {
+                        const t = (sp.getAttribute('title') || '').trim();
+                        if (!isNoise(t)) {
+                            addItem(t, guessType(t, isGrp));
+                            foundInRow = true;
+                            break;
+                        }
+                    }
+                    if (!foundInRow) {
+                        const autoSpans = row.querySelectorAll("span[dir='auto']");
+                        for (const sp of autoSpans) {
+                            const txt = (sp.innerText || sp.textContent || '').trim();
+                            if (!isNoise(txt)) {
+                                addItem(txt, guessType(txt, isGrp));
                                 break;
                             }
                         }
-                        if (!foundInRow) {
-                            const autoSpans = row.querySelectorAll("span[dir='auto']");
-                            for (const sp of autoSpans) {
-                                const txt = (sp.innerText || sp.textContent || '').trim();
-                                if (!isNoise(txt)) {
-                                    addItem(txt, guessType(txt, isGrp));
-                                    break;
-                                }
-                            }
-                        }
-                    });
-                } else {
-                    rootEl.querySelectorAll("span[dir='auto'][title], span[title]").forEach(sp => {
-                        const t = (sp.getAttribute('title') || '').trim();
-                        addItem(t, guessType(t, false));
-                    });
-                }
+                    }
+                });
+
+                // También escanear cualquier span[title] directo en #pane-side que no haya caído en las filas anteriores
+                const seenRowBoxes = new Set();
+                rootEl.querySelectorAll("span[dir='auto'][title], span[title]").forEach(sp => {
+                    const rowBox = sp.closest("[role='listitem'], [role='row'], div[data-testid='cell-frame-container'], div[tabindex='-1'], div[style*='translateY'], div[style*='height']");
+                    if (rowBox) {
+                        if (processedRows.has(rowBox) || seenRowBoxes.has(rowBox)) return;
+                        seenRowBoxes.add(rowBox);
+                    }
+                    const t = (sp.getAttribute('title') || '').trim();
+                    if (!isNoise(t) && !t.includes('\\n')) {
+                        const hasGroupIcon = rowBox ? Boolean(rowBox.querySelector("span[data-icon*='group'], span[data-icon*='community'], span[data-icon*='default-group']")) : false;
+                        addItem(t, guessType(t, hasGroupIcon));
+                    }
+                });
             };
 
             try {
-                const pane = document.querySelector('#pane-side') || document.querySelector('#side');
+                const pane = document.querySelector("#pane-side, [data-testid='chat-list'], div[aria-label*='Lista de chats'], div[aria-label*='Chat list'], div[role='grid'], #side") || document.body;
                 extractFromContainer(pane);
-                if (!skipScroll && pane && pane.scrollHeight > pane.clientHeight) {
+                if (!skipScroll && pane && pane !== document.body && pane.scrollHeight > pane.clientHeight) {
                     const origScroll = pane.scrollTop;
                     for (let i = 0; i < 8; i++) {
                         pane.scrollTop += 520;
@@ -1197,8 +1205,8 @@ def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
                 }
             } catch (e) {}
 
-            // 2. Leer desde IndexedDB (model-storage) SOLO si ya existe la BD y #pane-side está montado
-            if (!skipIdb && document.querySelector('#pane-side, #side')) {
+            // 2. Leer desde IndexedDB (model-storage)
+            if (!skipIdb) {
                 try {
                     let modelDbExists = true;
                     if (window.indexedDB && typeof indexedDB.databases === 'function') {
@@ -1246,7 +1254,7 @@ def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
                             const idNameMap = new Map();
                             for (const g of groupsMeta) {
                                 const gid = String(g.id || '');
-                                const subj = String(g.subject || g.name || '').trim();
+                                const subj = String(g.subject || g.name || g.formattedTitle || '').trim();
                                 if (subj) {
                                     idNameMap.set(gid, { name: subj, isGroup: true });
                                     addItem(subj, 'Grupo');
@@ -1256,12 +1264,10 @@ def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
                                 const cid = String(c.id || '');
                                 if (cid.includes('status@broadcast') || cid.includes('@newsletter')) continue;
                                 const isGrp = cid.includes('@g.us') || Boolean(c.isGroup);
-                                const cName = String(c.name || c.verifiedName || c.shortName || c.pushname || '').trim();
+                                const cName = String(c.name || c.formattedName || c.verifiedName || c.shortName || c.pushname || c.notifyName || '').trim();
                                 if (cName) {
                                     idNameMap.set(cid, { name: cName, isGroup: isGrp });
-                                    if (c.name || isGrp || c.isAddressBookContact || c.isWAContact || c.pushname) {
-                                        addItem(cName, isGrp ? 'Grupo' : guessType(cName, false));
-                                    }
+                                    addItem(cName, isGrp ? 'Grupo' : guessType(cName, false));
                                 }
                             }
                             for (const ch of chats) {
@@ -1275,6 +1281,22 @@ def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
                                 }
                             }
                         }
+                    }
+                } catch (e) {}
+            }
+
+            // 3. Si aún hay pocos contactos y no es búsqueda rápida, abrir brevemente el panel "Nuevo chat" para leer la agenda
+            if (!skipScroll && seen.size < 3) {
+                try {
+                    const newChatIcon = document.querySelector("span[data-icon='new-chat-outline'], [data-testid='chat'], button[aria-label*='Nuevo chat'], div[title*='Nuevo chat'], button[aria-label*='New chat']");
+                    const btn = newChatIcon ? (newChatIcon.closest("button, div[role='button']") || newChatIcon) : null;
+                    if (btn) {
+                        btn.click();
+                        await new Promise(r => setTimeout(r, 900));
+                        extractFromContainer(document.querySelector('#app') || document.body);
+                        const backIcon = document.querySelector("span[data-icon='back'], span[data-icon='x'], [data-testid='back']");
+                        const backBtn = backIcon ? (backIcon.closest("button, div[role='button']") || backIcon) : null;
+                        if (backBtn) backBtn.click();
                     }
                 } catch (e) {}
             }
@@ -1333,27 +1355,13 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
                 context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True, lightweight_qr=True)
                 page = context.pages[0] if context.pages else context.new_page()
 
-                def intercept_route(route):
-                    try:
-                        if route.request.resource_type in ("media", "font", "image"):
-                            route.abort()
-                        else:
-                            route.continue_()
-                    except Exception:
-                        pass
-
-                try:
-                    page.route("**/*", intercept_route)
-                except Exception:
-                    pass
-
                 page.goto("https://web.whatsapp.com", wait_until="domcontentloaded", timeout=60000)
 
                 detectados = []
                 start_wait = time.time()
                 qr_seen_count = 0
-                # Esperar primero a que #pane-side o #side aparezca en el DOM SIN bloquear IndexedDB
-                while time.time() - start_wait < 75:
+                # Esperar primero a que #pane-side o #side aparezca en el DOM SIN bloquear la red de Chromium
+                while time.time() - start_wait < 60:
                     wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
                     dom_state = page.evaluate("""() => {
                         // Cerrar modales tipo 'Continuar' / 'Aceptar'
@@ -1364,11 +1372,35 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
                                 try { b.click(); } catch (e) {}
                             }
                         }
-                        if (document.querySelector("#pane-side, #side, [data-testid='chat-list']")) {
-                            return 'ready';
+                        const readySelectors = [
+                            "#pane-side",
+                            "#side",
+                            "[data-testid='chat-list']",
+                            "header[data-testid='chatlist-header']",
+                            "div[aria-label*='Lista de chats']",
+                            "div[aria-label*='Chat list']",
+                            "div[contenteditable='true'][data-tab='3']",
+                            "button[aria-label*='Chats']",
+                            "span[data-icon='chats-filled']",
+                            "span[data-icon='new-chat-outline']",
+                            "div[role='grid']"
+                        ];
+                        for (const sel of readySelectors) {
+                            if (document.querySelector(sel)) {
+                                return 'ready';
+                            }
                         }
                         const c = document.querySelector("canvas[aria-label*='QR'], div[data-ref] canvas, [data-testid='qrcode'] canvas, canvas");
                         if (c && c.width >= 80 && c.height >= 80) {
+                            return 'qr';
+                        }
+                        const bodyTxt = document.body ? (document.body.innerText || "") : "";
+                        if (
+                            bodyTxt.includes("Pasos para iniciar sesión") ||
+                            bodyTxt.includes("Steps to log in") ||
+                            bodyTxt.includes("Vincular con el número") ||
+                            bodyTxt.includes("Link with phone number")
+                        ) {
                             return 'qr';
                         }
                         return 'loading';
@@ -1387,16 +1419,18 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
                             f"Buscando '{search_query}' en tus chats de WhatsApp..."
                             if search_query else f"Extrayendo grupos y contactos de {safe_empresa.title()}..."
                         )
-                        time.sleep(2.8)
-                        detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=search_query)
-                        if len(detectados) == 0:
-                            time.sleep(3.0)
-                            detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=search_query)
+                        for attempt_idx in range(8):
+                            page.wait_for_timeout(1800)
+                            wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
+                            q_now = search_query if attempt_idx == 0 else None
+                            detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=q_now)
+                            if len(detectados) > 0 and not wa_contactos_sync_state[safe_empresa].get("pending_query"):
+                                break
                         break
 
                     elapsed = int(time.time() - start_wait)
                     wa_contactos_sync_state[safe_empresa]["status_text"] = f"Abriendo tus chats de WhatsApp ({safe_empresa.title()})... ({elapsed}s)"
-                    time.sleep(2.0)
+                    page.wait_for_timeout(1200)
 
                 if importar_a_destinatarios and detectados:
                     existentes = {d["nombre"].lower() for d in database.db_obtener_destinatarios(empresa_id=safe_empresa)}
@@ -1533,22 +1567,6 @@ def qr_worker(empresa_id="contidep", run_id=0):
                 context = abrir_contexto_whatsapp(p, empresa_id=safe_empresa, headless=True, lightweight_qr=True)
                 page = context.pages[0] if context.pages else context.new_page()
 
-                # Bloquear fuentes, audio/video e imágenes externas pesadas para acelerar carga y ahorrar RAM en la nube
-                def intercept_route(route):
-                    try:
-                        rtype = route.request.resource_type
-                        if rtype in ("media", "font", "image"):
-                            route.abort()
-                        else:
-                            route.continue_()
-                    except Exception:
-                        pass
-
-                try:
-                    page.route("**/*", intercept_route)
-                except Exception:
-                    pass
-
                 with qr_lock:
                     if qr_global_run_id == run_id and not qr_state[safe_empresa]["qr_base64"]:
                         qr_state[safe_empresa]["status_text"] = f"Conectando con WhatsApp Web ({safe_empresa.title()})..."
@@ -1662,7 +1680,7 @@ def qr_worker(empresa_id="contidep", run_id=0):
                         err_str = str(eval_err).lower()
                         if consecutive_errors >= 4 or "closed" in err_str or "crashed" in err_str or "target" in err_str:
                             raise eval_err
-                        time.sleep(1.0)
+                        page.wait_for_timeout(800)
                         continue
 
                     state = res.get("state") if isinstance(res, dict) else "loading"
@@ -1698,26 +1716,27 @@ def qr_worker(empresa_id="contidep", run_id=0):
                             total_extraidos = 0
                             pane_wait_start = time.time()
                             has_pane = False
-                            while time.time() - pane_wait_start < 90:
-                                if qr_global_run_id != run_id or automation_status["is_running"]:
+                            while time.time() - pane_wait_start < 75:
+                                if qr_global_run_id != run_id or automation_state["is_running"]:
                                     break
+                                wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
                                 try:
                                     has_pane = page.evaluate("() => Boolean(document.querySelector('#pane-side, #side, [data-testid=\"chat-list\"]'))")
                                 except Exception:
                                     has_pane = False
                                 if has_pane:
-                                    break
+                                    wa_contactos_sync_state[safe_empresa]["status_text"] = f"Extrayendo grupos y contactos de {safe_empresa.title()}..."
+                                    det = extraer_y_guardar_contactos_wa(page, safe_empresa)
+                                    total_extraidos = len(det)
+                                    if total_extraidos > 0:
+                                        break
                                 elapsed_sync = int(time.time() - pane_wait_start)
-                                wa_contactos_sync_state[safe_empresa]["status_text"] = f"Descargando historial inicial de WhatsApp ({safe_empresa.title()})... ({elapsed_sync}s)"
-                                time.sleep(2.0)
+                                wa_contactos_sync_state[safe_empresa]["status_text"] = f"Descargando tus grupos y contactos de WhatsApp ({safe_empresa.title()})... ({elapsed_sync}s)"
+                                page.wait_for_timeout(1800)
 
-                            if has_pane and qr_global_run_id == run_id and not automation_status["is_running"]:
-                                wa_contactos_sync_state[safe_empresa]["status_text"] = f"Extrayendo grupos y contactos de {safe_empresa.title()}..."
-                                time.sleep(3.0)
-                                det = extraer_y_guardar_contactos_wa(page, safe_empresa)
-                                total_extraidos = len(det)
-                                for step in range(8):
-                                    if qr_global_run_id != run_id or automation_status["is_running"]:
+                            if has_pane and qr_global_run_id == run_id and not automation_state["is_running"]:
+                                for step in range(6):
+                                    if qr_global_run_id != run_id or automation_state["is_running"]:
                                         break
                                     try:
                                         page.evaluate("""(s) => {
@@ -1726,14 +1745,14 @@ def qr_worker(empresa_id="contidep", run_id=0):
                                         }""", step + 1)
                                     except Exception:
                                         pass
-                                    time.sleep(0.55)
+                                    page.wait_for_timeout(500)
                                     det = extraer_y_guardar_contactos_wa(page, safe_empresa)
                                     if len(det) > total_extraidos:
                                         total_extraidos = len(det)
                             if total_extraidos > 0:
                                 add_log("success", f"📋 [{safe_empresa.title()}] {total_extraidos} grupos y contactos sincronizados desde WhatsApp.")
-                        except Exception:
-                            pass
+                        except Exception as ex_sync:
+                            print(f"[QR Post-Sync] Error: {ex_sync}")
                         finally:
                             wa_contactos_sync_state[safe_empresa]["is_syncing"] = False
                             wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
@@ -1761,7 +1780,7 @@ def qr_worker(empresa_id="contidep", run_id=0):
                             if qr_global_run_id == run_id and not qr_state[safe_empresa]["qr_base64"]:
                                 qr_state[safe_empresa]["status_text"] = f"Generando código QR de WhatsApp ({safe_empresa.title()})... ({elapsed}s)"
 
-                    time.sleep(1.5 if had_qr else 0.9)
+                    page.wait_for_timeout(1200 if had_qr else 750)
 
                 try:
                     context.close()
