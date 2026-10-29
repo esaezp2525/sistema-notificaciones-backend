@@ -274,8 +274,19 @@ def init_db():
     )
     """)
 
+    # 9. Tabla de Contactos y Grupos Detectados de WhatsApp Conectado
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS contactos_whatsapp (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nombre TEXT NOT NULL,
+        tipo TEXT DEFAULT 'Grupo',
+        empresa_id TEXT DEFAULT 'contidep',
+        actualizado_en TEXT DEFAULT ''
+    )
+    """)
+
     # MIGRACIÓN: Asegurar columna empresa_id en todas las tablas
-    for tabla in ["destinatarios", "notificaciones", "automatizaciones", "historial_envios", "plantillas_texto"]:
+    for tabla in ["destinatarios", "notificaciones", "automatizaciones", "historial_envios", "plantillas_texto", "contactos_whatsapp"]:
         cursor.execute(f"PRAGMA table_info({tabla})")
         cols = [col["name"] for col in cursor.fetchall()]
         if "empresa_id" not in cols:
@@ -804,4 +815,69 @@ def db_eliminar_plantilla(pid):
     cursor.execute("DELETE FROM plantillas_texto WHERE id = ?", (pid,))
     conn.commit()
     conn.close()
+
+# ==================== CONTACTOS Y GRUPOS DISPONIBLES DE WHATSAPP ====================
+def db_obtener_contactos_wa(empresa_id="contidep"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, nombre, tipo, empresa_id, actualizado_en FROM contactos_whatsapp WHERE empresa_id = ? ORDER BY CASE WHEN tipo = 'Grupo' THEN 0 ELSE 1 END, nombre COLLATE NOCASE ASC",
+        (empresa_id,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def db_guardar_contactos_wa(lista_contactos, empresa_id="contidep", replace_all=False):
+    if not lista_contactos and not replace_all:
+        return 0
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if replace_all:
+        cursor.execute("DELETE FROM contactos_whatsapp WHERE empresa_id = ?", (empresa_id,))
+        existentes_map = {}
+    else:
+        cursor.execute("SELECT id, nombre, tipo FROM contactos_whatsapp WHERE empresa_id = ?", (empresa_id,))
+        existentes_map = {str(r["nombre"]).strip().lower(): dict(r) for r in cursor.fetchall()}
+
+    seen = set()
+    agregados = 0
+    for item in lista_contactos:
+        if isinstance(item, dict):
+            nom = str(item.get("nombre", "")).strip()
+            tipo = str(item.get("tipo", "Grupo")).strip() or "Grupo"
+        else:
+            nom = str(item).strip()
+            tipo = "Grupo"
+        if not nom or len(nom) < 2:
+            continue
+        key = nom.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        if key in existentes_map:
+            prev = existentes_map[key]
+            nuevo_tipo = "Grupo" if (tipo == "Grupo" or prev.get("tipo") == "Grupo") else "Contacto"
+            cursor.execute(
+                "UPDATE contactos_whatsapp SET nombre = ?, tipo = ?, actualizado_en = ? WHERE id = ?",
+                (nom, nuevo_tipo, now_str, prev["id"])
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO contactos_whatsapp (nombre, tipo, empresa_id, actualizado_en) VALUES (?, ?, ?, ?)",
+                (nom, tipo, empresa_id, now_str)
+            )
+            agregados += 1
+    conn.commit()
+    conn.close()
+    return agregados
+
+def db_limpiar_contactos_wa(empresa_id="contidep"):
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM contactos_whatsapp WHERE empresa_id = ?", (empresa_id,))
+    conn.commit()
+    conn.close()
+
 

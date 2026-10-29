@@ -11,6 +11,7 @@ const STORAGE_KEY_USERS = 'notif_web_users';
 const STORAGE_KEY_API = 'notif_web_api_url';
 const STORAGE_KEY_EMPRESA = 'notif_empresa_activa';
 const STORAGE_KEY_PLANTILLAS = 'notif_web_plantillas';
+const STORAGE_KEY_WA_CONTACTS = 'notif_web_wa_contacts';
 
 const DEFAULT_CLOUD_API = 'https://sistema-notificaciones-backend.onrender.com';
 
@@ -84,20 +85,10 @@ let apiUrl = savedApi;
 let localMotorAvailable = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 
 async function detectarMotorLocal() {
-  if (localMotorAvailable) return true;
-  try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 1400);
-    const res = await fetch(`${LOCAL_MOTOR_API}/api/logs`, { signal: controller.signal });
-    clearTimeout(timer);
-    if (res.ok) {
-      localMotorAvailable = true;
-      apiUrl = LOCAL_MOTOR_API;
-      console.info('[Motor] Motor local rápido detectado en 127.0.0.1:5829');
-      return true;
-    }
-  } catch (e) {
-    // Motor local no activo o bloqueado por navegador; usar motor en la nube (Render)
+  if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
+    localMotorAvailable = true;
+    apiUrl = window.location.origin;
+    return true;
   }
   return false;
 }
@@ -107,6 +98,13 @@ let notificacionesData = [];
 let automatizacionesData = [];
 let plantillasData = [];
 let usuariosData = [];
+let contactosWAData = [];
+let waContactosSearch = '';
+let waContactosTipoFilter = 'todos';
+let waSelectedMap = new Map();
+let waSyncingInProgress = false;
+let waSyncStatusText = '';
+let waContactosPollTimer = null;
 let searchQuery = '';
 let plantillaFiltroCategoria = 'todas';
 let plantillaSearchQuery = '';
@@ -417,9 +415,13 @@ function setupEventListeners() {
 
   // Modales
   document.getElementById('btn-nuevo-destinatario')?.addEventListener('click', () => abrirModalDestinatario());
-  document.getElementById('btn-cerrar-modal-dest')?.addEventListener('click', () => cerrarModal('modal-destinatario'));
-  document.getElementById('btn-cancelar-modal-dest')?.addEventListener('click', () => cerrarModal('modal-destinatario'));
+  document.getElementById('btn-cerrar-modal-dest')?.addEventListener('click', () => cerrarModalDestinatario());
+  document.getElementById('btn-cancelar-modal-dest')?.addEventListener('click', () => cerrarModalDestinatario());
   document.getElementById('btn-guardar-destinatario')?.addEventListener('click', guardarDestinatario);
+  document.getElementById('wa-contactos-search')?.addEventListener('input', (e) => {
+    waContactosSearch = e.target.value.toLowerCase().trim();
+    renderListaContactosWA();
+  });
 
   document.getElementById('btn-nueva-notificacion')?.addEventListener('click', () => abrirModalNotificacion());
   document.getElementById('btn-cerrar-modal-notif')?.addEventListener('click', () => cerrarModal('modal-notificacion'));
@@ -626,6 +628,8 @@ function setupEventListeners() {
             body: JSON.stringify({ empresa: currentEmpresa })
           });
           const data = await res.json();
+          contactosWAData = [];
+          localStorage.removeItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`);
           showToast(data.message || `WhatsApp de ${cfg.nombre} desvinculado`, 'info');
           cerrarModalQR();
           verificarEstadoWhatsApp();
@@ -646,7 +650,15 @@ function setupEventListeners() {
     }
   });
 
-  document.getElementById('btn-abrir-modal-scan')?.addEventListener('click', () => abrirModalQR(false));
+  document.getElementById('btn-abrir-modal-scan')?.addEventListener('click', () => {
+    const dot = document.getElementById('wa-status-dot');
+    if (dot && dot.classList.contains('online')) {
+      abrirModalDestinatario();
+      sincronizarContactosWhatsApp(true);
+    } else {
+      abrirModalQR(false);
+    }
+  });
   document.getElementById('btn-cerrar-modal-qr')?.addEventListener('click', cerrarModalQR);
   document.getElementById('btn-cancelar-modal-qr')?.addEventListener('click', cerrarModalQR);
   document.getElementById('btn-regenerar-qr')?.addEventListener('click', () => abrirModalQR(true));
@@ -696,6 +708,10 @@ async function verificarEstadoWhatsApp() {
         btnWA.title = `Desvincular WhatsApp de ${cfg.nombre}`;
       }
       if (btnDisconnect) btnDisconnect.style.display = 'inline-block';
+      // Pre-cargar contactos y grupos disponibles de WhatsApp en segundo plano
+      if (!contactosWAData || contactosWAData.length === 0) {
+        sincronizarContactosWhatsApp(false);
+      }
     } else {
       if (dot) dot.className = 'status-dot offline';
       if (text) text.textContent = `WA ${cfg.nombre}: Desconectado`;
@@ -799,6 +815,7 @@ function abrirModalQR(forceReset = false) {
         clearInterval(qrPollInterval);
         qrPollInterval = null;
         verificarEstadoWhatsApp();
+        sincronizarContactosWhatsApp(false);
         showToast(`¡WhatsApp de ${cfg.nombre} vinculado exitosamente!`, 'success');
         return;
       } else if (data.status_text && statusText) {
@@ -850,6 +867,12 @@ async function cargarDatos() {
         notificacionesData = data.notificaciones || [];
         automatizacionesData = data.automatizaciones || [];
         plantillasData = data.plantillas || [];
+        if (Array.isArray(data.contactos_wa) && data.contactos_wa.length > 0) {
+          contactosWAData = data.contactos_wa;
+          localStorage.setItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`, JSON.stringify(contactosWAData));
+        } else {
+          contactosWAData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`) || '[]');
+        }
         if (plantillasData.length === 0) {
           plantillasData = [...DEFAULT_PLANTILLAS_CHILENAS];
         }
@@ -895,6 +918,7 @@ async function cargarDatos() {
   notificacionesData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_MSGS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_MSGS) || '[]');
   automatizacionesData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_AUTOS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_AUTOS) || '[]');
   plantillasData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`) || localStorage.getItem(STORAGE_KEY_PLANTILLAS) || '[]');
+  contactosWAData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`) || '[]');
   if (plantillasData.length === 0) {
     plantillasData = [...DEFAULT_PLANTILLAS_CHILENAS];
     localStorage.setItem(`${STORAGE_KEY_PLANTILLAS}_${currentEmpresa}`, JSON.stringify(plantillasData));
@@ -1512,14 +1536,300 @@ window.eliminarUsuario = function(userId, username) {
   );
 };
 
-// ==================== CRUD OPERACIONES ====================
+// ==================== CRUD OPERACIONES & SELECTOR WHATSAPP ====================
 window.abrirModalDestinatario = function(d = null) {
   document.getElementById('dest-id').value = d ? d.id : '';
   document.getElementById('dest-nombre').value = d ? d.nombre : '';
   document.getElementById('dest-tipo').value = d ? d.tipo : 'Grupo';
   document.getElementById('dest-activo').checked = d ? d.activo : true;
   document.getElementById('modal-destinatario-titulo').textContent = d ? 'Editar Destinatario' : 'Agregar Destinatario';
+
+  const cfg = EMPRESAS_CONFIG[currentEmpresa] || EMPRESAS_CONFIG.contidep;
+  const empLabel = document.getElementById('wa-list-empresa-label');
+  if (empLabel) empLabel.textContent = cfg.nombre;
+
+  waSelectedMap.clear();
+  waContactosSearch = '';
+  const searchEl = document.getElementById('wa-contactos-search');
+  if (searchEl) searchEl.value = '';
+  filtrarTipoContactosWA('todos', false);
+  actualizarResumenSeleccionWA();
+
+  contactosWAData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`) || '[]');
+  renderListaContactosWA();
   abrirModal('modal-destinatario');
+  sincronizarContactosWhatsApp(false);
+};
+
+function cerrarModalDestinatario() {
+  if (waContactosPollTimer) {
+    clearInterval(waContactosPollTimer);
+    waContactosPollTimer = null;
+  }
+  cerrarModal('modal-destinatario');
+}
+
+window.filtrarTipoContactosWA = function(tipo, shouldRender = true) {
+  waContactosTipoFilter = tipo || 'todos';
+  const btns = document.querySelectorAll('#wa-contactos-filter-tabs .wa-filter-btn');
+  btns.forEach(btn => {
+    const isAct = btn.getAttribute('data-tipo') === waContactosTipoFilter;
+    btn.classList.toggle('active', isAct);
+    btn.style.background = isAct ? '#2563eb' : '#ffffff';
+    btn.style.color = isAct ? '#ffffff' : '#475569';
+    btn.style.borderColor = isAct ? '#2563eb' : '#cbd5e1';
+  });
+  if (shouldRender) renderListaContactosWA();
+};
+
+function obtenerContactosWAFiltrados() {
+  return (contactosWAData || []).filter(c => {
+    if (!c || !c.nombre) return false;
+    if (waContactosTipoFilter !== 'todos' && c.tipo !== waContactosTipoFilter) return false;
+    if (waContactosSearch && !c.nombre.toLowerCase().includes(waContactosSearch)) return false;
+    return true;
+  });
+}
+
+function actualizarResumenSeleccionWA() {
+  const summaryBox = document.getElementById('wa-selected-summary');
+  const countText = document.getElementById('wa-selected-count-text');
+  const btnGuardar = document.getElementById('btn-guardar-destinatario');
+  const isEdit = Boolean(document.getElementById('dest-id')?.value);
+  const count = waSelectedMap.size;
+
+  if (summaryBox && countText) {
+    if (count > 0 && !isEdit) {
+      summaryBox.style.display = 'flex';
+      countText.textContent = count === 1
+        ? '1 contacto/grupo seleccionado de WhatsApp'
+        : `${count} contactos/grupos seleccionados para agregar`;
+    } else {
+      summaryBox.style.display = 'none';
+    }
+  }
+  if (btnGuardar) {
+    if (!isEdit && count > 1) {
+      btnGuardar.textContent = `➕ Agregar ${count} Destinatarios`;
+    } else {
+      btnGuardar.textContent = 'Guardar Destinatario';
+    }
+  }
+}
+
+window.limpiarSeleccionWA = function() {
+  waSelectedMap.clear();
+  actualizarResumenSeleccionWA();
+  renderListaContactosWA();
+};
+
+window.toggleSeleccionarTodosWA = function() {
+  const existentesSet = new Set((destinatariosData || []).map(d => String(d.nombre || '').trim().toLowerCase()));
+  const disponibles = obtenerContactosWAFiltrados().filter(c => !existentesSet.has(String(c.nombre).trim().toLowerCase()));
+  if (disponibles.length === 0) {
+    showToast('Todos los contactos visibles ya están agregados.', 'info');
+    return;
+  }
+  const allSelected = disponibles.every(c => waSelectedMap.has(c.nombre.trim().toLowerCase()));
+  if (allSelected) {
+    disponibles.forEach(c => waSelectedMap.delete(c.nombre.trim().toLowerCase()));
+  } else {
+    disponibles.forEach(c => waSelectedMap.set(c.nombre.trim().toLowerCase(), { nombre: c.nombre.trim(), tipo: c.tipo || 'Grupo' }));
+    if (disponibles.length === 1) {
+      document.getElementById('dest-nombre').value = disponibles[0].nombre.trim();
+      document.getElementById('dest-tipo').value = disponibles[0].tipo || 'Grupo';
+    }
+  }
+  actualizarResumenSeleccionWA();
+  renderListaContactosWA();
+};
+
+window.seleccionarContactoWA = function(idx) {
+  const filtrados = obtenerContactosWAFiltrados();
+  const item = filtrados[idx];
+  if (!item) return;
+
+  const isEdit = Boolean(document.getElementById('dest-id')?.value);
+  const nom = String(item.nombre || '').trim();
+  const tipo = item.tipo || 'Grupo';
+  const key = nom.toLowerCase();
+  const yaExiste = (destinatariosData || []).some(d => String(d.nombre || '').trim().toLowerCase() === key);
+
+  // Siempre rellenar los campos manuales con el último clic para comodidad del usuario
+  const inputNom = document.getElementById('dest-nombre');
+  const selectTipo = document.getElementById('dest-tipo');
+  if (inputNom) inputNom.value = nom;
+  if (selectTipo) selectTipo.value = tipo;
+
+  if (isEdit || yaExiste) {
+    renderListaContactosWA();
+    return;
+  }
+
+  if (waSelectedMap.has(key)) {
+    waSelectedMap.delete(key);
+    if (waSelectedMap.size === 1) {
+      const unico = Array.from(waSelectedMap.values())[0];
+      if (inputNom) inputNom.value = unico.nombre;
+      if (selectTipo) selectTipo.value = unico.tipo;
+    }
+  } else {
+    waSelectedMap.set(key, { nombre: nom, tipo });
+  }
+
+  actualizarResumenSeleccionWA();
+  renderListaContactosWA();
+};
+
+function renderListaContactosWA() {
+  const container = document.getElementById('wa-contactos-list');
+  const badgeCount = document.getElementById('wa-list-count-badge');
+  const btnRefresh = document.getElementById('btn-refresh-wa-contactos');
+  if (!container) return;
+
+  if (badgeCount) {
+    badgeCount.textContent = `${(contactosWAData || []).length} detectados`;
+  }
+  if (btnRefresh) {
+    btnRefresh.innerHTML = waSyncingInProgress ? '⏳ Sincronizando...' : '🔄 Actualizar de WhatsApp';
+    btnRefresh.disabled = waSyncingInProgress;
+  }
+
+  const isOnline = document.getElementById('wa-status-dot')?.classList.contains('online');
+  const filtrados = obtenerContactosWAFiltrados();
+  const existentesSet = new Set((destinatariosData || []).map(d => String(d.nombre || '').trim().toLowerCase()));
+
+  let syncBannerHtml = '';
+  if (waSyncingInProgress) {
+    syncBannerHtml = `
+      <div style="display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: #eff6ff; border-bottom: 1px solid #bfdbfe; color: #1d4ed8; font-size: 12px; font-weight: 500;">
+        <div class="spinner" style="width: 14px; height: 14px; border: 2px solid #93c5fd; border-top-color: #1d4ed8; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;"></div>
+        <span>${escapeHtml(waSyncStatusText || 'Extrayendo lista de grupos y contactos desde tu WhatsApp conectado...')}</span>
+      </div>
+    `;
+  }
+
+  if ((!contactosWAData || contactosWAData.length === 0) && !waSyncingInProgress) {
+    if (!isOnline) {
+      container.innerHTML = `
+        <div style="padding: 20px 14px; text-align: center; color: #64748b; font-size: 12.5px;">
+          <div style="font-size: 26px; margin-bottom: 6px;">📴</div>
+          <p style="margin: 0 0 8px 0;">El WhatsApp de esta empresa aún no está conectado.</p>
+          <button type="button" onclick="cerrarModalDestinatario(); abrirModalQR(false);" style="background: #2563eb; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">
+            📲 Conectar WhatsApp para ver mis grupos y contactos
+          </button>
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div style="padding: 20px 14px; text-align: center; color: #64748b; font-size: 12.5px;">
+          <div style="font-size: 26px; margin-bottom: 6px;">💬</div>
+          <p style="margin: 0 0 8px 0;">Aún no se han cargado los chats desde tu sesión conectada.</p>
+          <button type="button" onclick="sincronizarContactosWhatsApp(true)" style="background: #16a34a; color: #fff; border: none; border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;">
+            🔄 Cargar grupos y contactos de mi WhatsApp ahora
+          </button>
+        </div>
+      `;
+    }
+    return;
+  }
+
+  if (filtrados.length === 0) {
+    container.innerHTML = syncBannerHtml + `
+      <div style="padding: 18px 12px; text-align: center; color: #94a3b8; font-size: 12.5px;">
+        ${waSyncingInProgress ? 'Esperando que finalice la lectura de tus chats en WhatsApp...' : 'No se encontraron grupos ni contactos con ese filtro.'}
+      </div>
+    `;
+    return;
+  }
+
+  let itemsHtml = syncBannerHtml;
+  filtrados.forEach((item, idx) => {
+    const nom = String(item.nombre || '').trim();
+    const tipo = item.tipo === 'Contacto' ? 'Contacto' : 'Grupo';
+    const key = nom.toLowerCase();
+    const yaExiste = existentesSet.has(key);
+    const isSelected = waSelectedMap.has(key);
+
+    itemsHtml += `
+      <div onclick="seleccionarContactoWA(${idx})"
+           style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 10px; border-bottom: 1px solid #f1f5f9; border-radius: 6px; cursor: pointer; transition: background 0.15s; background: ${isSelected ? '#eff6ff' : (yaExiste ? '#f8fafc' : '#ffffff')};">
+        <div style="display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1;">
+          <input type="checkbox" ${isSelected || yaExiste ? 'checked' : ''} ${yaExiste ? 'disabled' : ''} style="pointer-events: none; accent-color: #2563eb; width: 15px; height: 15px; flex-shrink: 0;">
+          <span style="font-size: 15px; flex-shrink: 0;">${tipo === 'Grupo' ? '🏢' : '👤'}</span>
+          <span style="font-size: 13px; font-weight: ${isSelected ? '700' : '500'}; color: ${yaExiste ? '#94a3b8' : '#1e293b'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+            ${escapeHtml(nom)}
+          </span>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+          <span style="font-size: 10.5px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: ${tipo === 'Grupo' ? '#e0f2fe' : '#f3e8ff'}; color: ${tipo === 'Grupo' ? '#0284c7' : '#7e22ce'};">
+            ${tipo}
+          </span>
+          ${yaExiste
+            ? '<span style="font-size: 10.5px; font-weight: 600; color: #16a34a; background: #dcfce7; padding: 2px 6px; border-radius: 999px;">✓ Agregado</span>'
+            : (isSelected ? '<span style="font-size: 10.5px; font-weight: 700; color: #2563eb;">Seleccionado</span>' : '<span style="font-size: 11px; color: #64748b;">+ Elegir</span>')
+          }
+        </div>
+      </div>
+    `;
+  });
+
+  container.innerHTML = itemsHtml;
+}
+
+window.sincronizarContactosWhatsApp = async function(forceRefresh = false) {
+  try {
+    if (forceRefresh) {
+      waSyncingInProgress = true;
+      waSyncStatusText = 'Conectando con tu sesión de WhatsApp para actualizar la lista...';
+      renderListaContactosWA();
+    }
+    const qParam = forceRefresh ? '&refresh=1' : '';
+    const res = await fetch(getApiEndpoint(`/api/whatsapp/contactos?empresa=${currentEmpresa}${qParam}`));
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (Array.isArray(data.contactos) && data.contactos.length > 0) {
+      contactosWAData = data.contactos;
+      localStorage.setItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`, JSON.stringify(contactosWAData));
+    }
+
+    waSyncingInProgress = Boolean(data.sincronizando);
+    waSyncStatusText = data.status_text || '';
+    renderListaContactosWA();
+
+    if (waSyncingInProgress) {
+      if (!waContactosPollTimer) {
+        waContactosPollTimer = setInterval(async () => {
+          try {
+            const pRes = await fetch(getApiEndpoint(`/api/whatsapp/contactos?empresa=${currentEmpresa}`));
+            if (!pRes.ok) return;
+            const pData = await pRes.json();
+            if (Array.isArray(pData.contactos) && pData.contactos.length > 0) {
+              contactosWAData = pData.contactos;
+              localStorage.setItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`, JSON.stringify(contactosWAData));
+            }
+            waSyncingInProgress = Boolean(pData.sincronizando);
+            waSyncStatusText = pData.status_text || '';
+            renderListaContactosWA();
+            if (!waSyncingInProgress) {
+              clearInterval(waContactosPollTimer);
+              waContactosPollTimer = null;
+              if (contactosWAData.length > 0) {
+                showToast(`Lista de WhatsApp actualizada: ${contactosWAData.length} disponibles.`, 'success');
+              }
+            }
+          } catch (e) {}
+        }, 2200);
+      }
+    } else if (waContactosPollTimer) {
+      clearInterval(waContactosPollTimer);
+      waContactosPollTimer = null;
+    }
+  } catch (err) {
+    waSyncingInProgress = false;
+    renderListaContactosWA();
+  }
 };
 
 window.editarDestinatario = function(id) {
@@ -1557,8 +1867,72 @@ async function guardarDestinatario() {
   const tipo = document.getElementById('dest-tipo').value;
   const activo = document.getElementById('dest-activo').checked;
 
-  if (!nombre) {
-    showToast('El nombre es requerido.', 'error');
+  // Modo agregar múltiple desde la lista de WhatsApp
+  if (!idStr && waSelectedMap.size > 1) {
+    const lote = Array.from(waSelectedMap.values());
+    if (nombre && !waSelectedMap.has(nombre.toLowerCase())) {
+      lote.push({ nombre, tipo });
+    }
+    try {
+      const res = await fetch(getApiEndpoint('/api/destinatarios/guardar-lote'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          destinatarios: lote,
+          activo,
+          empresa_id: currentEmpresa
+        })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.destinatarios)) {
+          destinatariosData = data.destinatarios;
+          localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
+          showToast(`¡Se agregaron ${data.agregados || lote.length} destinatarios de WhatsApp!`, 'success');
+          cerrarModalDestinatario();
+          cargarDatos();
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn("Backend no disponible al guardar lote:", err);
+    }
+
+    // Fallback local si el servidor tarda
+    const existentesSet = new Set(destinatariosData.map(x => String(x.nombre || '').toLowerCase()));
+    let nextId = destinatariosData.length > 0 ? Math.max(...destinatariosData.map(x => Number(x.id) || 0)) + 1 : 1;
+    lote.forEach(it => {
+      if (!existentesSet.has(it.nombre.toLowerCase())) {
+        destinatariosData.push({
+          id: nextId++,
+          nombre: it.nombre,
+          tipo: it.tipo || 'Grupo',
+          activo,
+          automatizaciones: [],
+          estado: 'Pendiente',
+          fecha: '',
+          empresa_id: currentEmpresa
+        });
+        existentesSet.add(it.nombre.toLowerCase());
+      }
+    });
+    localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
+    showToast(`¡Se agregaron ${lote.length} destinatarios de WhatsApp!`, 'success');
+    cerrarModalDestinatario();
+    cargarDatos();
+    return;
+  }
+
+  let finalNombre = nombre;
+  let finalTipo = tipo;
+  if (!finalNombre && waSelectedMap.size === 1) {
+    const unico = Array.from(waSelectedMap.values())[0];
+    finalNombre = unico.nombre;
+    finalTipo = unico.tipo;
+  }
+
+  if (!finalNombre) {
+    showToast('Selecciona un contacto/grupo de la lista de WhatsApp o escribe su nombre.', 'error');
     return;
   }
 
@@ -1568,8 +1942,8 @@ async function guardarDestinatario() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: idStr ? parseInt(idStr) : undefined,
-        nombre,
-        tipo,
+        nombre: finalNombre,
+        tipo: finalTipo,
         activo,
         empresa_id: currentEmpresa
       })
@@ -1581,15 +1955,15 @@ async function guardarDestinatario() {
   if (idStr) {
     const id = parseInt(idStr);
     const d = destinatariosData.find(x => x.id === id);
-    if (d) { d.nombre = nombre; d.tipo = tipo; d.activo = activo; }
+    if (d) { d.nombre = finalNombre; d.tipo = finalTipo; d.activo = activo; }
   } else {
     const nextId = destinatariosData.length > 0 ? Math.max(...destinatariosData.map(x => x.id)) + 1 : 1;
-    destinatariosData.push({ id: nextId, nombre, tipo, activo, automatizaciones: [], estado: 'Pendiente', fecha: '', empresa_id: currentEmpresa });
+    destinatariosData.push({ id: nextId, nombre: finalNombre, tipo: finalTipo, activo, automatizaciones: [], estado: 'Pendiente', fecha: '', empresa_id: currentEmpresa });
   }
 
   localStorage.setItem(`${STORAGE_KEY_DEST}_${currentEmpresa}`, JSON.stringify(destinatariosData));
   showToast('Destinatario guardado.', 'success');
-  cerrarModal('modal-destinatario');
+  cerrarModalDestinatario();
   cargarDatos();
 }
 
