@@ -1048,6 +1048,66 @@ wa_contactos_sync_state = {
     "medcapital": {"is_syncing": False, "status_text": "", "last_sync": 0, "last_attempt": 0, "pending_query": ""}
 }
 
+# Diagnóstico: última captura de lo que ve el navegador headless en cada etapa
+wa_debug_snapshots = {"contidep": [], "medcapital": []}
+
+def capturar_diagnostico_wa(page, empresa_id, etapa):
+    """Guarda captura de pantalla + resumen del DOM para diagnosticar por qué no aparecen chats."""
+    safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
+    snap = {"time": datetime.now().strftime("%H:%M:%S"), "etapa": etapa}
+    try:
+        snap["dom"] = page.evaluate("""async () => {
+            const q = (s) => document.querySelectorAll(s).length;
+            let dbs = [];
+            try { if (indexedDB.databases) dbs = (await indexedDB.databases()).map(d => d.name); } catch (e) {}
+            const titles = Array.from(document.querySelectorAll("span[title]")).slice(0, 25).map(s => s.getAttribute('title'));
+            return {
+                url: location.href,
+                title: document.title,
+                pane_side: q('#pane-side'),
+                side: q('#side'),
+                chat_list: q("[data-testid='chat-list']"),
+                grid: q("div[role='grid']"),
+                listitem: q("[role='listitem']"),
+                row: q("[role='row']"),
+                span_title: q('span[title]'),
+                canvas: q('canvas'),
+                idb: dbs,
+                span_titles_sample: titles,
+                body_text: (document.body ? document.body.innerText : '').slice(0, 600)
+            };
+        }""")
+    except Exception as e:
+        snap["dom_error"] = str(e)
+    try:
+        png = page.screenshot(type="jpeg", quality=45, timeout=8000)
+        snap["screenshot"] = "data:image/jpeg;base64," + base64.b64encode(png).decode("ascii")
+    except Exception as e:
+        snap["screenshot_error"] = str(e)
+    lst = wa_debug_snapshots[safe_empresa]
+    lst.append(snap)
+    if len(lst) > 6:
+        lst.pop(0)
+    try:
+        d = snap.get("dom") or {}
+        add_log("info", f"[{safe_empresa.title()}] Diagnóstico '{etapa}': pane={d.get('pane_side')} grid={d.get('grid')} rows={d.get('row')} items={d.get('listitem')} titles={d.get('span_title')} idb={len(d.get('idb') or [])}")
+    except Exception:
+        pass
+    return snap
+
+@app.route("/api/whatsapp/debug", methods=["GET"])
+def api_whatsapp_debug():
+    empresa = request.args.get("empresa", "contidep")
+    safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
+    with_img = request.args.get("img", "0") == "1"
+    out = []
+    for s in wa_debug_snapshots[safe_empresa]:
+        item = dict(s)
+        if not with_img:
+            item.pop("screenshot", None)
+        out.append(item)
+    return jsonify({"success": True, "empresa": safe_empresa, "snapshots": out})
+
 def ejecutar_busqueda_en_barra_wa(page, query_text):
     """Escribe un término en el buscador interno de WhatsApp Web, extrae los resultados y limpia el filtro."""
     q = str(query_text or "").strip()
@@ -1426,11 +1486,17 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
                             detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=q_now)
                             if len(detectados) > 0 and not wa_contactos_sync_state[safe_empresa].get("pending_query"):
                                 break
+                        capturar_diagnostico_wa(page, safe_empresa, f"sync-ready ({len(detectados)} contactos)")
                         break
 
                     elapsed = int(time.time() - start_wait)
                     wa_contactos_sync_state[safe_empresa]["status_text"] = f"Abriendo tus chats de WhatsApp ({safe_empresa.title()})... ({elapsed}s)"
                     page.wait_for_timeout(1200)
+                else:
+                    capturar_diagnostico_wa(page, safe_empresa, "sync-timeout (nunca cargó la lista de chats)")
+
+                if not detectados:
+                    add_log("warning", f"[{safe_empresa.title()}] La sincronización terminó con 0 grupos/contactos. Revisa /api/whatsapp/debug.")
 
                 if importar_a_destinatarios and detectados:
                     existentes = {d["nombre"].lower() for d in database.db_obtener_destinatarios(empresa_id=safe_empresa)}
@@ -1751,8 +1817,11 @@ def qr_worker(empresa_id="contidep", run_id=0):
                                         total_extraidos = len(det)
                             if total_extraidos > 0:
                                 add_log("success", f"📋 [{safe_empresa.title()}] {total_extraidos} grupos y contactos sincronizados desde WhatsApp.")
+                            else:
+                                add_log("warning", f"[{safe_empresa.title()}] Post-vinculación: 0 grupos/contactos (pane={has_pane}).")
+                            capturar_diagnostico_wa(page, safe_empresa, f"post-QR ({total_extraidos} contactos)")
                         except Exception as ex_sync:
-                            print(f"[QR Post-Sync] Error: {ex_sync}")
+                            add_log("error", f"[{safe_empresa.title()}] Error extrayendo tras vincular: {ex_sync}")
                         finally:
                             wa_contactos_sync_state[safe_empresa]["is_syncing"] = False
                             wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
