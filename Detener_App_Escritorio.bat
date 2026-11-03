@@ -1,5 +1,5 @@
 @echo off
-chcp 65001 > nul
+setlocal
 title Detener Sistema de Notificaciones
 cd /d "%~dp0"
 
@@ -15,5 +15,5 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 echo [OK] El motor local se ha detenido con exito.
-timeout /t 2 >nul
+ping -n 2 127.0.0.1 >nul
 exit /b 0

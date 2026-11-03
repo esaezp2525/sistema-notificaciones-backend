@@ -1,26 +1,30 @@
 ============================================================
-   SISTEMA DE NOTIFICACIONES WHATSAPP
+   SISTEMA DE NOTIFICACIONES WHATSAPP (MOTOR LOCAL)
 ============================================================
 
-INSTRUCCIONES PARA LA PERSONA QUE RECIBE ESTE ARCHIVO:
+INSTRUCCIONES DE USO:
 
-1. Descomprime este archivo .ZIP en una carpeta de tu equipo
-   (por ejemplo en tu Escritorio o en Documentos).
-
-2. Haz doble clic en el archivo:
-   👉 "Instalar_en_otra_PC.bat"
-   
-   Esto instalará los componentes automáticamente y creará
-   el acceso directo "Sistema de Notificaciones" en tu Escritorio.
-
-3. Para abrir el programa en el día a día:
+1. PARA ABRIR LA APLICACIÓN:
    - Haz doble clic en el acceso directo "Sistema de Notificaciones"
+     (o "Notificador F29") en tu Escritorio.
    - O haz doble clic en "Iniciar_App_Escritorio.bat".
 
-4. Cómo funciona:
-   - Pestaña Destinatarios: Agrega personas o grupos (manual o escaneando de WhatsApp).
-   - Asigna con casillas de verificación (Checklist) qué automatizaciones recibe cada uno.
-   - Pestaña Mensajes: Crea y edita N plantillas de notificación personalizadas.
-   - Pestaña Automatizaciones: Configura el día de envío (hábil o normal) y la hora.
-   - Haz clic en "Conectar WhatsApp" la primera vez para vincular el QR.
+   La aplicación se abrirá automáticamente en tu pantalla como
+   una ventana de escritorio conectada a tu computador (localhost:5829).
+
+2. VINCULAR TU WHATSAPP (Solo se hace una vez):
+   - Haz clic en "📲 Conectar" en la esquina superior derecha.
+   - En 3 segundos aparecerá el código QR.
+   - Escanéalo con tu celular (WhatsApp > Dispositivos vinculados).
+   - ¡Listo! Tu sesión se guarda permanentemente en este equipo
+     (no se borrará al reiniciar ni al apagar el PC).
+
+3. EXTRAER GRUPOS Y CONTACTOS:
+   - En la pestaña "Destinatarios", haz clic en "+ Agregar Destinatario".
+   - Verás la lista completa de todos tus grupos y contactos de WhatsApp.
+   - Puedes buscar por nombre o marcar la casilla de los que desees agregar.
+
+4. PARA DETENER EL SERVIDOR:
+   - Haz doble clic en "Detener_App_Escritorio.bat" cuando quieras
+     cerrar el motor local por completo.
 ============================================================

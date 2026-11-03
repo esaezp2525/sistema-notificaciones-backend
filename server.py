@@ -1,5 +1,13 @@
 import os
 import sys
+
+# Redirigir stdout y stderr para capturar cualquier mensaje o error en segundo plano
+try:
+    crash_log = open("server_debug.log", "a", encoding="utf-8", buffering=1)
+    sys.stdout = crash_log
+    sys.stderr = crash_log
+except Exception:
+    pass
 import json
 import time
 import re

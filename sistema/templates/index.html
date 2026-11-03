@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css?v=22">
+  <link rel="stylesheet" href="/style.css?v=24">
 </head>
 <body>
   <!-- OVERLAY DE INICIO DE SESIÓN -->
@@ -65,6 +65,12 @@
             <span class="status-dot" id="wa-status-dot"></span>
             <span class="status-text" id="wa-status-text">WhatsApp: Verificando...</span>
             <button type="button" class="btn-wa-header" id="btn-probar-wa">📲 Conectar</button>
+          </div>
+
+          <!-- MODO MOTOR (LOCAL VS NUBE) -->
+          <div class="wa-status-pill" id="motor-status-pill" style="cursor: pointer;" onclick="document.getElementById('btn-config-servidor').click()" title="Haz clic para ver o cambiar entre Motor Local (Tu PC) y Motor Nube">
+            <span class="status-dot" id="motor-status-dot" style="background: #16a34a;"></span>
+            <span class="status-text" id="motor-status-text">Motor Local (Tu PC)</span>
           </div>
         </div>
 
@@ -473,7 +479,10 @@
           <!-- Buscador y Filtros de Lista WhatsApp -->
           <div id="wa-list-controls" style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 8px;">
             <div style="display: flex; gap: 6px; align-items: center;">
-              <input type="search" id="wa-contactos-search" class="form-input" placeholder="🔍 Filtrar grupo o contacto de tu WhatsApp..." style="padding: 6px 10px; font-size: 12.5px; flex: 1;">
+              <input type="search" id="wa-contactos-search" class="form-input" placeholder="🔍 Escribe el nombre del grupo o persona..." style="padding: 6px 10px; font-size: 12.5px; flex: 1;">
+              <button type="button" id="btn-buscar-wa-directo" onclick="buscarEnWhatsAppDirecto()" title="Buscar este nombre directamente dentro de tu WhatsApp conectado" style="background: #16a34a; color: #ffffff; border: 1px solid #15803d; border-radius: 6px; padding: 6px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px;">
+                🔍 Buscar en WA
+              </button>
             </div>
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; flex-wrap: wrap;">
               <div style="display: flex; gap: 4px;" id="wa-contactos-filter-tabs">
@@ -857,19 +866,46 @@
 
   <!-- MODAL: CONFIGURAR SERVIDOR BACKEND -->
   <div class="modal-backdrop" id="modal-config-servidor">
-    <div class="modal-box" style="max-width: 480px;">
+    <div class="modal-box" style="max-width: 520px;">
       <div class="modal-header">
         <h3>⚙️ Conexión con Motor de Envíos</h3>
         <button class="modal-close-btn" id="btn-cerrar-modal-servidor">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size: 13.5px; color: #475569; margin-bottom: 14px;">
-          Esta aplicación web se conecta a tu motor de WhatsApp para ejecutar los envíos y escanear contactos.
+        <p style="font-size: 13.5px; color: #475569; margin-bottom: 12px;">
+          Selecciona el motor que gestionará WhatsApp Web y los envíos:
         </p>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px;">
+          <div id="card-motor-local" onclick="seleccionarPresetMotor('local')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 10px; border: 2px solid #16a34a; background: #f0fdf4; transition: all 0.2s;">
+            <div>
+              <div style="font-weight: 700; font-size: 13.5px; color: #15803d; display: flex; align-items: center; gap: 6px;">
+                💻 Motor Local (Tu Computador)
+                <span style="font-size: 10.5px; background: #bbf7d0; color: #166534; padding: 2px 7px; border-radius: 999px;">RECOMENDADO</span>
+              </div>
+              <div style="font-size: 12px; color: #166534; margin-top: 3px;">
+                WhatsApp queda vinculado permanentemente, escanea grupos al instante y usa toda la memoria de tu PC.
+              </div>
+            </div>
+            <span style="font-size: 18px; color: #16a34a; font-weight: 700;">✓</span>
+          </div>
+
+          <div id="card-motor-cloud" onclick="seleccionarPresetMotor('cloud')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #cbd5e1; background: #f8fafc; transition: all 0.2s;">
+            <div>
+              <div style="font-weight: 600; font-size: 13.5px; color: #334155;">
+                ☁️ Motor en la Nube (Render)
+              </div>
+              <div style="font-size: 11.5px; color: #64748b; margin-top: 3px;">
+                Servidor remoto compartido (plan gratis con reinicio periódico y 512MB RAM).
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="form-group">
-          <label for="input-api-url">Dirección URL del Servidor / API:</label>
-          <input type="text" id="input-api-url" class="form-input" placeholder="https://sistema-notificaciones-backend.onrender.com">
-          <p class="input-hint">Motor en la nube por defecto: <code>https://sistema-notificaciones-backend.onrender.com</code></p>
+          <label for="input-api-url">Dirección URL del Servidor / API Activa:</label>
+          <input type="text" id="input-api-url" class="form-input" placeholder="http://localhost:5829">
+          <p class="input-hint" id="motor-hint-text">Actualmente configurado con el motor local en tu PC.</p>
         </div>
       </div>
       <div class="modal-footer">
@@ -933,6 +969,6 @@
 
   <div class="toast-hub" id="toast-container"></div>
 
-  <script src="/app.js?v=22"></script>
+  <script src="/app.js?v=24"></script>
 </body>
 </html>
