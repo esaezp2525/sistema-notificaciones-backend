@@ -77,19 +77,79 @@ let currentUser = null;
 let savedApi = localStorage.getItem(STORAGE_KEY_API);
 if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
   savedApi = window.location.origin;
-} else if (!savedApi || savedApi.includes('127.0.0.1') || savedApi.includes('localhost')) {
+} else if (!savedApi) {
   savedApi = DEFAULT_CLOUD_API;
   localStorage.setItem(STORAGE_KEY_API, DEFAULT_CLOUD_API);
 }
 let apiUrl = savedApi;
 let localMotorAvailable = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost');
 
+function actualizarEstadoMotorUI() {
+  const dot = document.getElementById('motor-status-dot');
+  const text = document.getElementById('motor-status-text');
+  const isLocal = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' || (apiUrl && (apiUrl.includes('127.0.0.1') || apiUrl.includes('localhost'))));
+  if (text && dot) {
+    if (isLocal) {
+      dot.style.background = '#16a34a';
+      text.textContent = '💻 Motor Local (Tu PC)';
+      text.title = 'Ejecutando en tu PC: Sesión de WhatsApp permanente y escaneo instantáneo';
+    } else {
+      dot.style.background = '#2563eb';
+      text.textContent = '☁️ Motor Nube (Render)';
+      text.title = 'Servidor en la nube';
+    }
+  }
+}
+
+window.seleccionarPresetMotor = function(preset) {
+  const cardLocal = document.getElementById('card-motor-local');
+  const cardCloud = document.getElementById('card-motor-cloud');
+  const inputEl = document.getElementById('input-api-url');
+  const hintEl = document.getElementById('motor-hint-text');
+
+  if (preset === 'local') {
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      solicitarConfirmacion(
+        'Abrir en Motor Local (PC)',
+        'Para utilizar el motor local de tu computador con almacenamiento ilimitado y sesión permanente, la aplicación se abrirá en http://localhost:5829. ¿Deseas abrirla ahora?',
+        () => {
+          window.location.href = 'http://localhost:5829';
+        }
+      );
+      return;
+    }
+    if (inputEl) inputEl.value = 'http://localhost:5829';
+    if (hintEl) hintEl.textContent = 'Motor local activo en tu computador (localhost:5829).';
+    if (cardLocal) {
+      cardLocal.style.border = '2px solid #16a34a';
+      cardLocal.style.background = '#f0fdf4';
+    }
+    if (cardCloud) {
+      cardCloud.style.border = '1.5px solid #cbd5e1';
+      cardCloud.style.background = '#f8fafc';
+    }
+  } else {
+    if (inputEl) inputEl.value = DEFAULT_CLOUD_API;
+    if (hintEl) hintEl.textContent = 'Motor en la nube activo (Render).';
+    if (cardCloud) {
+      cardCloud.style.border = '2px solid #2563eb';
+      cardCloud.style.background = '#eff6ff';
+    }
+    if (cardLocal) {
+      cardLocal.style.border = '1.5px solid #cbd5e1';
+      cardLocal.style.background = '#ffffff';
+    }
+  }
+};
+
 async function detectarMotorLocal() {
   if (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') {
     localMotorAvailable = true;
     apiUrl = window.location.origin;
+    actualizarEstadoMotorUI();
     return true;
   }
+  actualizarEstadoMotorUI();
   return false;
 }
 
@@ -549,9 +609,12 @@ function setupEventListeners() {
   document.getElementById('btn-cancelar-modal-admin-clave')?.addEventListener('click', () => cerrarModal('modal-admin-clave-user'));
   document.getElementById('btn-confirmar-admin-clave')?.addEventListener('click', confirmarClaveAdmin);
 
-  // Configuración de servidor remoto
+  // Configuración de servidor remoto / motor
   document.getElementById('btn-config-servidor')?.addEventListener('click', () => {
-    document.getElementById('input-api-url').value = apiUrl;
+    const inputEl = document.getElementById('input-api-url');
+    if (inputEl) inputEl.value = apiUrl;
+    const isLocal = (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost' || (apiUrl && (apiUrl.includes('127.0.0.1') || apiUrl.includes('localhost'))));
+    window.seleccionarPresetMotor(isLocal ? 'local' : 'cloud');
     abrirModal('modal-config-servidor');
   });
   document.getElementById('btn-cerrar-modal-servidor')?.addEventListener('click', () => cerrarModal('modal-config-servidor'));
@@ -559,7 +622,8 @@ function setupEventListeners() {
   document.getElementById('btn-guardar-api-url')?.addEventListener('click', () => {
     apiUrl = document.getElementById('input-api-url').value.trim();
     localStorage.setItem(STORAGE_KEY_API, apiUrl);
-    showToast('Configuración de servidor guardada.', 'success');
+    actualizarEstadoMotorUI();
+    showToast('Configuración de motor guardada.', 'success');
     cerrarModal('modal-config-servidor');
     cargarDatos();
     verificarEstadoWhatsApp();

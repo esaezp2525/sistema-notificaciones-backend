@@ -1,15 +1,17 @@
 @echo off
+chcp 65001 > nul
 setlocal
-title Consola - Contidep F29 WhatsApp
+title Consola - Sistema de Notificaciones WhatsApp (Motor Local)
 cd /d "%~dp0"
 
 echo ========================================================
-echo   CONTIDEP F29 WHATSAPP - APLICACION DE ESCRITORIO
+echo   SISTEMA DE NOTIFICACIONES — CONSOLA DE REGISTROS
 echo ========================================================
 echo.
-echo Iniciando servidor y ventana de aplicacion...
+echo Iniciando servidor local en http://localhost:5829 ...
 echo.
 
+start "" "http://localhost:5829"
 "%~dp0venv\Scripts\python.exe" "%~dp0server.py"
 
 if %ERRORLEVEL% NEQ 0 (

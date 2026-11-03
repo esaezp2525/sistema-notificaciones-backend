@@ -173,6 +173,17 @@ def limpiar_locks_perfil(sess_dir):
                 os.remove(lock_path)
         except Exception:
             pass
+    try:
+        for root, dirs, files in os.walk(sess_dir):
+            for file in files:
+                if file.upper() == "LOCK":
+                    p = os.path.join(root, file)
+                    try:
+                        os.remove(p)
+                    except Exception:
+                        pass
+    except Exception:
+        pass
 
 def forzar_cierre_playwright():
     """Cierra instancias huérfanas de Chrome asociadas al perfil de WhatsApp."""
@@ -191,7 +202,7 @@ def forzar_cierre_playwright():
         limpiar_locks_perfil(get_session_dir(emp))
 
 def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None, lightweight_qr=False):
-    """Abre el navegador persistente para WhatsApp Web optimizado en memoria y CPU."""
+    """Abre el navegador persistente para WhatsApp Web con alto rendimiento y sesión persistente."""
     if headless is None:
         headless = IS_HEADLESS
     sess_dir = get_session_dir(empresa_id)
@@ -210,29 +221,11 @@ def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None, lightweight
                     "--disable-dev-shm-usage",
                     "--disable-blink-features=AutomationControlled",
                     "--disable-infobars",
-                    "--disable-gpu",
-                    "--disable-software-rasterizer",
                     "--disable-extensions",
-                    "--disable-background-networking",
-                    "--disable-background-timer-throttling",
-                    "--disable-backgrounding-occluded-windows",
-                    "--disable-breakpad",
-                    "--disable-component-extensions-with-background-pages",
-                    "--disable-default-apps",
-                    "--disable-features=TranslateUI,BlinkGenPropertyTrees,IsolateOrigins,site-per-process",
-                    "--disable-ipc-flooding-protection",
-                    "--disable-renderer-backgrounding",
-                    "--disable-sync",
-                    "--metrics-recording-only",
-                    "--mute-audio",
                     "--no-first-run",
                     "--no-default-browser-check",
-                    "--renderer-process-limit=1",
-                    "--blink-settings=imagesEnabled=false",
-                    "--disk-cache-size=67108864",
-                    "--media-cache-size=1",
+                    "--mute-audio",
                     "--disable-notifications",
-                    "--js-flags=--max-old-space-size=256",
                     f"--window-size={vw},{vh}"
                 ],
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -242,9 +235,9 @@ def abrir_contexto_whatsapp(p, empresa_id="contidep", headless=None, lightweight
             return ctx
         except Exception as e:
             ultimo_error = e
-            add_log("warning", f"[{empresa_id.title()}] Intento {intento+1}: Carpeta bloqueada. Liberando procesos...")
+            add_log("warning", f"[{empresa_id.title()}] Intento {intento+1}: Perfil bloqueado. Liberando procesos...")
             forzar_cierre_playwright()
-            time.sleep(1.0)
+            time.sleep(0.8)
     raise ultimo_error
 
 # ==================== TRABAJADOR DE ENVÍOS (WORKER) ====================
