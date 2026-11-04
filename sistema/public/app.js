@@ -108,36 +108,57 @@ window.seleccionarPresetMotor = function(preset) {
   const hintEl = document.getElementById('motor-hint-text');
 
   if (preset === 'local') {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      solicitarConfirmacion(
-        'Abrir en Motor Local (PC)',
-        'Para utilizar el motor local de tu computador con almacenamiento ilimitado y sesión permanente, la aplicación se abrirá en http://localhost:5829. ¿Deseas abrirla ahora?',
-        () => {
-          window.location.href = 'http://localhost:5829';
-        }
-      );
-      return;
-    }
     if (inputEl) inputEl.value = 'http://localhost:5829';
-    if (hintEl) hintEl.textContent = 'Motor local activo en tu computador (localhost:5829).';
     if (cardLocal) {
       cardLocal.style.border = '2px solid #16a34a';
       cardLocal.style.background = '#f0fdf4';
+      const check = document.getElementById('check-motor-local');
+      if (check) check.style.display = 'block';
     }
     if (cardCloud) {
       cardCloud.style.border = '1.5px solid #cbd5e1';
-      cardCloud.style.background = '#f8fafc';
+      cardCloud.style.background = '#ffffff';
+      const check = document.getElementById('check-motor-cloud');
+      if (check) check.style.display = 'none';
+    }
+
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (hintEl) {
+        hintEl.innerHTML = `
+          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px; margin-top: 8px;">
+            <div style="font-weight: 700; color: #15803d; font-size: 13px; margin-bottom: 4px;">
+              💻 Motor Local Seleccionado (Tu PC)
+            </div>
+            <div style="font-size: 12px; color: #166534; line-height: 1.4;">
+              Para que tu navegador se comunique con WhatsApp Web local sin restricciones de seguridad HTTPS, haz clic abajo para abrir la aplicación directamente en tu PC:
+            </div>
+            <a href="http://localhost:5829" style="display: inline-block; margin-top: 8px; background: #16a34a; color: white; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; text-decoration: none;">
+              🚀 Abrir en localhost:5829
+            </a>
+          </div>
+        `;
+      }
+    } else {
+      if (hintEl) {
+        hintEl.innerHTML = '<span style="color: #16a34a; font-weight: 700;">✅ Motor local activo en tu computador (localhost:5829).</span>';
+      }
     }
   } else {
     if (inputEl) inputEl.value = DEFAULT_CLOUD_API;
-    if (hintEl) hintEl.textContent = 'Motor en la nube activo (Render).';
+    if (hintEl) {
+      hintEl.innerHTML = '<span style="color: #2563eb; font-weight: 600;">☁️ Motor en la nube activo (Render).</span>';
+    }
     if (cardCloud) {
       cardCloud.style.border = '2px solid #2563eb';
       cardCloud.style.background = '#eff6ff';
+      const check = document.getElementById('check-motor-cloud');
+      if (check) check.style.display = 'block';
     }
     if (cardLocal) {
       cardLocal.style.border = '1.5px solid #cbd5e1';
       cardLocal.style.background = '#ffffff';
+      const check = document.getElementById('check-motor-local');
+      if (check) check.style.display = 'none';
     }
   }
 };
@@ -623,8 +644,18 @@ function setupEventListeners() {
     apiUrl = document.getElementById('input-api-url').value.trim();
     localStorage.setItem(STORAGE_KEY_API, apiUrl);
     actualizarEstadoMotorUI();
-    showToast('Configuración de motor guardada.', 'success');
     cerrarModal('modal-config-servidor');
+
+    const isLocal = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+    if (isLocal && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      showToast('Configurado motor local. Abriendo en tu PC...', 'info');
+      setTimeout(() => {
+        window.location.href = 'http://localhost:5829';
+      }, 600);
+      return;
+    }
+
+    showToast('Configuración de motor guardada.', 'success');
     cargarDatos();
     verificarEstadoWhatsApp();
   });
@@ -2728,18 +2759,59 @@ function generarPlantillaConIA(promptText, modo) {
     return {
       titulo: 'Operación Renta F22 y Declaraciones Juradas Anuales',
       categoria: 'Tributario / SII',
-      cuerpo: 'Proceso Operación Renta - SII Chile 📊🇨🇱\n\nEstimados señores *{nombre}*,\n\nLes informamos que se encuentra abierto el proceso de *Operación Renta Anual*.\n\n📝 *Etapas del Proceso:*\n1️⃣ Declaraciones Juradas (Sueldos, Honorarios, Retiros y Rentas).\n2️⃣ Confección del Balance General y Determinación de Renta Líquida Imponible.\n3️⃣ Declaración y presentación del *Formulario 22 (F22)*.\n\nLes solicitamos coordinar una reunión o confirmar la información financiera preliminar enviada a su correo.\n\nAtentamente,\n*Equipo Tributario & Auditoría*',
+      cuerpo: 'Proceso Operación Renta - SII Chile 📊🇨🇱\n\nEstimados señores *{nombre}*,\n\nLes informamos que se encuentra abierto el proceso de *Operación Renta Anual*.\n\n📝 *Etapas del Proceso:*\n1️⃣ Declaraciones Juradas (Sueldos, Honorarios, Retiros y Rentas).\n2️⃣ Confección del Balance General y Determinación de Renta Líquida Imponible.\n3️⃣ Declaración y presentación del *Formulario 22 (F22)*.\n\nLes solicitamos coordinar una reunión o confirmar la información contable y tributaria preliminar enviada a su correo.\n\nAtentamente,\n*Equipo Tributario & Auditoría*',
       explicacion: 'Plantilla completa para el proceso tributario anual de Renta en Chile.'
     };
   }
 
-  // Plantilla libre basada en la petición del usuario
+  // MODO: CUMPLEAÑOS Y CELEBRACIONES
+  if (p.includes('cumple') || p.includes('nacimiento') || p.includes('aniversario') || p.includes('felicita') || p.includes('felicidades')) {
+    return {
+      titulo: 'Saludo Festivo de Feliz Cumpleaños',
+      categoria: 'General',
+      cuerpo: '🎂🎉 *¡MUY FELIZ CUMPLEAÑOS, {nombre}!* 🎈✨\n\nEstimado/a *{nombre}*,\n\nEn este día tan especial queremos enviarte un afectuoso y cordial saludo de parte de todo nuestro equipo. 🥳\n\nTe deseamos una jornada llena de alegría, salud, éxitos y momentos inolvidables junto a tus seres queridos y familia. 🎁🌟\n\n¡Que este nuevo año de vida venga cargado de metas cumplidas y muchas bendiciones!\n\nUn gran abrazo y felicidades,\n*Equipo de Notificaciones* 🤝🎈',
+      explicacion: 'Plantilla festiva y cálida para cumpleaños con emoticones de celebración, torta y globos.'
+    };
+  }
+
+  // MODO: FESTIVIDADES, NAVIDAD Y EFEMÉRIDES
+  if (p.includes('navidad') || p.includes('pascua') || p.includes('año nuevo') || p.includes('fiestas patrias') || p.includes('18 de sept')) {
+    return {
+      titulo: 'Saludo de Fiestas y Conmemoraciones',
+      categoria: 'General',
+      cuerpo: '🌟✨ *¡FELICES FIESTAS, {nombre}!* ✨🌟\n\nEstimado/a *{nombre}*,\n\nEsperando que te encuentres muy bien, queremos hacer una pausa en nuestras labores para enviarte un cálido saludo en estas fechas tan especiales. 🤝🎉\n\nTe deseamos que disfrutes de un merecido descanso y gratos momentos de unión en compañía de tu familia y seres queridos. 🥂🇨🇱\n\n¡Que sea un tiempo de descanso, prosperidad y mucha energía positiva!\n\nAtentamente,\n*Equipo de Notificaciones* 🌟',
+      explicacion: 'Mensaje de saludo formal y festivo con emoticones de celebración para fechas conmemorativas.'
+    };
+  }
+
+  // MODO: REUNIÓN O COORDINACIÓN DE AGENDA
+  if (p.includes('reunion') || p.includes('reunión') || p.includes('cita') || p.includes('agendar') || p.includes('coordin')) {
+    return {
+      titulo: 'Coordinación de Reunión y Agenda',
+      categoria: 'General',
+      cuerpo: 'Estimado/a *{nombre}*,\n\nEsperando que se encuentre muy bien, le escribimos para coordinar nuestra próxima *Reunión*: 📅⏰\n\n📌 *Detalles Propuestos:*\n• Fecha propuesta: [DÍA / FECHA]\n• Hora: [HORA] hrs.\n• Modalidad: [Presencial / Videollamada Google Meet / WhatsApp]\n• Motivo: [TEMAS A TRATAR]\n\nPor favor indíquenos si le acomoda este horario o si prefiere proponernos otra alternativa que le resulte más conveniente.\n\nQuedamos atentos a su confirmación.\n\nSaludos cordiales,\n*Equipo de Notificaciones* 🤝',
+      explicacion: 'Plantilla de coordinación de reuniones con datos de fecha, hora y modalidad listos para completar.'
+    };
+  }
+
+  // MODO: AGRADECIMIENTO Y BIENVENIDA
+  if (p.includes('gracia') || p.includes('agradec') || p.includes('bienvenid')) {
+    return {
+      titulo: 'Mensaje de Bienvenida y Agradecimiento',
+      categoria: 'General',
+      cuerpo: '🤝✨ *¡Muchas Gracias por su Confianza, {nombre}!* ✨🤝\n\nEstimado/a *{nombre}*,\n\nQueremos expresar nuestro más sincero agradecimiento por su preferencia y por permitirnos acompañarle en sus gestiones. 🌟\n\nNuestro compromiso es entregarle siempre una atención ágil, clara y de la más alta calidad.\n\nRecuerde que nuestros canales de contacto están siempre abiertos ante cualquier consulta o requerimiento.\n\n¡Un cordial saludo!\n*Equipo de Notificaciones* 💼',
+      explicacion: 'Mensaje de cortesía y fidelización con emoticones de cordialidad.'
+    };
+  }
+
+  // Plantilla libre basada en la petición del usuario (adaptativa con emoticones y sin conceptos financieros)
   const tituloLibre = promptText.length > 35 ? promptText.substring(0, 35) + '...' : promptText;
+  const asuntoTexto = promptText.charAt(0).toUpperCase() + promptText.slice(1);
   return {
     titulo: `Plantilla: ${tituloLibre.charAt(0).toUpperCase() + tituloLibre.slice(1)}`,
     categoria: 'General',
-    cuerpo: `Estimado/a *{nombre}*,\n\nEsperando que se encuentre muy bien, le contactamos desde el equipo contable:\n\n📌 *Asunto:* ${promptText}\n\n━━━━━━━━━━━━━━━━━━━━━\nℹ️ *Detalles importantes:*\n• Le solicitamos revisar la información adjunta.\n• Plazo de confirmación: Lo antes posible para evitar retrasos.\n\nQuedamos a su disposición ante cualquier duda o requerimiento.\n\nSaludos cordiales,\n*Asesoría Contable & Financiera* 🤝`,
-    explicacion: 'Plantilla personalizada generada según tu instrucción con estructura ejecutiva para WhatsApp.'
+    cuerpo: `📌 *COMUNICADO: ${asuntoTexto.toUpperCase()}* 📢\n\nHola *{nombre}*,\n\nEsperando que te encuentres muy bien, te compartimos la siguiente información importante:\n\n━━━━━━━━━━━━━━━━━━━━━\n💬 *Detalles:*\n👉 [Escribe aquí el contenido de tu mensaje para {nombre}...]\n👉 [Punto clave o acción requerida]\n\n📅 *Fecha de referencia:* {fecha}\n━━━━━━━━━━━━━━━━━━━━━\n\nQuedamos a tu entera disposición ante cualquier duda o consulta.\n\nSaludos cordiales,\n*Equipo de Notificaciones* 🤝✨`,
+    explicacion: 'Plantilla personalizada generada según tu instrucción con estructura ejecutiva, viñetas y emoticones para WhatsApp.'
   };
 }
 
@@ -2849,6 +2921,7 @@ function enviarMensajeAsistente(promptManual = null) {
     else if (promptManual === 'honorarios') promptText = 'Cobro formal de honorarios contables mensuales';
     else if (promptManual === 'patente') promptText = 'Aviso de vencimiento de patente municipal comercial';
     else if (promptManual === 'renta') promptText = 'Declaración anual Operación Renta F22 y balances';
+    else if (promptManual === 'cumpleanos') promptText = 'Mensaje festivo de feliz cumpleaños con emoticones y globos';
     else promptText = promptManual;
   } else if (inputEl) {
     promptText = inputEl.value.trim();
@@ -2988,11 +3061,19 @@ window.abrirTabChatIA = function() {
   const tabBtn = document.querySelector('.tab-item[data-tab="tab-plantillas"]');
   if (tabBtn) tabBtn.click();
   const btnSubnavChat = document.getElementById('btn-subnav-chat');
-  if (btnSubnavChat) btnSubnavChat.click();
+  const splitContainer = document.getElementById('plantillas-split-container');
+  if (btnSubnavChat) {
+    btnSubnavChat.classList.add('active');
+    document.getElementById('btn-subnav-catalogo')?.classList.remove('active');
+    splitContainer?.classList.add('show-chat');
+  }
   setTimeout(() => {
     const chatInput = document.getElementById('asistente-chat-input');
-    if (chatInput) chatInput.focus();
-  }, 150);
+    if (chatInput) {
+      chatInput.focus();
+      chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 120);
 };
 
 window.generarEnModalDesdeChip = function(modalType, promptKey) {
@@ -3002,6 +3083,9 @@ window.generarEnModalDesdeChip = function(modalType, promptKey) {
   else if (promptKey === 'previred') promptText = 'Aviso de pago de cotizaciones previsionales en Previred';
   else if (promptKey === 'cierre') promptText = 'Solicitud de facturas y cartolas para cierre contable mensual';
   else if (promptKey === 'honorarios') promptText = 'Cobro formal de honorarios contables mensuales';
+  else if (promptKey === 'patente') promptText = 'Aviso de vencimiento de patente municipal comercial';
+  else if (promptKey === 'renta') promptText = 'Declaración anual Operación Renta F22 y balances';
+  else if (promptKey === 'cumpleanos') promptText = 'Mensaje festivo de feliz cumpleaños con emoticones y globos';
   else if (promptKey === 'decorativos') {
     promptText = 'Plantilla solo con marcos decorativos, separadores y emojis';
     modo = 'decorativos';
@@ -3011,22 +3095,55 @@ window.generarEnModalDesdeChip = function(modalType, promptKey) {
     modo = 'decorativos';
   }
 
+  const isNotif = modalType === 'notif';
+  const modoRadio = document.querySelector(`input[name="modal-${isNotif ? 'notif' : 'plan'}-ia-modo"]:checked`);
+  if (modoRadio && modoRadio.value === 'decorativos') {
+    modo = 'decorativos';
+  }
+
   const res = generarPlantillaConIA(promptText, modo);
   aplicarResultadoIAEnModal(modalType, res);
 };
 
 window.generarEnModalConInput = function(modalType) {
-  const inputId = modalType === 'notif' ? 'modal-notif-ai-input' : 'modal-plantilla-ai-input';
-  const inputEl = document.getElementById(inputId);
+  const isNotif = modalType === 'notif';
+  const inputEl = document.getElementById(isNotif ? 'modal-notif-ia-input' : 'modal-plan-ia-input')
+    || document.getElementById(isNotif ? 'modal-notif-ai-input' : 'modal-plantilla-ai-input')
+    || document.getElementById('modal-plan-ia-input')
+    || document.getElementById('modal-notif-ia-input');
+
   const promptText = inputEl ? inputEl.value.trim() : '';
   if (!promptText) {
     showToast('Escribe una instrucción para el Asistente IA o elige un botón rápido.', 'info');
+    if (inputEl) inputEl.focus();
     return;
   }
-  const modo = (promptText.toLowerCase().includes('marco') || promptText.toLowerCase().includes('decorat') || promptText.toLowerCase().includes('emoji')) ? 'decorativos' : 'completo';
+
+  const modoRadio = document.querySelector(`input[name="modal-${isNotif ? 'notif' : 'plan'}-ia-modo"]:checked`);
+  let modo = modoRadio ? modoRadio.value : 'completo';
+  if (promptText.toLowerCase().includes('marco') || promptText.toLowerCase().includes('decorat') || promptText.toLowerCase().includes('emoji')) {
+    modo = 'decorativos';
+  }
+
   const res = generarPlantillaConIA(promptText, modo);
   aplicarResultadoIAEnModal(modalType, res);
   if (inputEl) inputEl.value = '';
+};
+
+window.mejorarTextoConIA = function(textareaId) {
+  const txt = document.getElementById(textareaId);
+  if (!txt) return;
+  const actual = txt.value.trim();
+  if (!actual) {
+    showToast('Escribe primero un borrador o usa los botones de arriba para generar con IA.', 'info');
+    txt.focus();
+    return;
+  }
+
+  const res = generarPlantillaConIA(actual, 'completo');
+  txt.value = res.cuerpo;
+  txt.focus();
+  showToast('✨ Mensaje mejorado y formateado con éxito por la IA.', 'success');
 };
 
 function aplicarResultadoIAEnModal(modalType, res) {

@@ -326,6 +326,7 @@
                   <button type="button" class="chip-prompt" data-prompt="honorarios">👔 Cobro de Honorarios</button>
                   <button type="button" class="chip-prompt" data-prompt="patente">🏛️ Patente Municipal</button>
                   <button type="button" class="chip-prompt" data-prompt="renta">📊 Declaración Renta F22</button>
+                  <button type="button" class="chip-prompt" data-prompt="cumpleanos">🎂 Cumpleaños</button>
                 </div>
 
                 <!-- SELECTOR DE FORMATO -->
@@ -577,6 +578,8 @@
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('notif', 'cierre')">📑 Cierre Mes</button>
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('notif', 'honorarios')">👔 Honorarios</button>
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('notif', 'patente')">🏛️ Patente</button>
+            <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('notif', 'renta')">📊 Renta F22</button>
+            <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('notif', 'cumpleanos')">🎂 Cumpleaños</button>
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('notif', 'decorativos')">✨ Marco con Emoticones</button>
           </div>
           <div class="modal-ai-input-row">
@@ -603,6 +606,7 @@
             <span style="margin-left: 6px;">Formato:</span>
             <button type="button" class="tag-btn" onclick="aplicarFormatoTexto('notif-input-cuerpo', '*')"><b>*Negrita*</b></button>
             <button type="button" class="tag-btn" onclick="aplicarFormatoTexto('notif-input-cuerpo', '_')"><i>_Cursiva_</i></button>
+            <button type="button" class="tag-btn tag-btn-ai" onclick="mejorarTextoConIA('notif-input-cuerpo')" title="Mejora la redacción, agrega negritas y emoticones profesionales con IA" style="margin-left: auto;">✨ Mejorar con IA</button>
           </div>
 
           <!-- SELECTOR DE EMOTICONES Y DECORATIVOS -->
@@ -645,6 +649,8 @@
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('plantilla', 'cierre')">📑 Cierre Mes</button>
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('plantilla', 'honorarios')">👔 Honorarios</button>
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('plantilla', 'patente')">🏛️ Patente</button>
+            <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('plantilla', 'renta')">📊 Renta F22</button>
+            <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('plantilla', 'cumpleanos')">🎂 Cumpleaños</button>
             <button type="button" class="chip-prompt" onclick="generarEnModalDesdeChip('plantilla', 'decorativos')">✨ Marco con Emoticones</button>
           </div>
           <div class="modal-ai-input-row">
@@ -682,6 +688,7 @@
             <span style="margin-left: 6px;">Formato:</span>
             <button type="button" class="tag-btn" onclick="aplicarFormatoTexto('plantilla-input-cuerpo', '*')"><b>*Negrita*</b></button>
             <button type="button" class="tag-btn" onclick="aplicarFormatoTexto('plantilla-input-cuerpo', '_')"><i>_Cursiva_</i></button>
+            <button type="button" class="tag-btn tag-btn-ai" onclick="mejorarTextoConIA('plantilla-input-cuerpo')" title="Mejora la redacción, agrega negritas y emoticones profesionales con IA" style="margin-left: auto;">✨ Mejorar con IA</button>
           </div>
 
           <!-- SELECTOR DE EMOTICONES Y DECORATIVOS -->
@@ -887,7 +894,7 @@
                 WhatsApp queda vinculado permanentemente, escanea grupos al instante y usa toda la memoria de tu PC.
               </div>
             </div>
-            <span style="font-size: 18px; color: #16a34a; font-weight: 700;">✓</span>
+            <span class="motor-check" id="check-motor-local" style="font-size: 18px; color: #16a34a; font-weight: 700;">✓</span>
           </div>
 
           <div id="card-motor-cloud" onclick="seleccionarPresetMotor('cloud')" style="cursor: pointer; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 10px; border: 1.5px solid #cbd5e1; background: #f8fafc; transition: all 0.2s;">
@@ -899,6 +906,7 @@
                 Servidor remoto compartido (plan gratis con reinicio periódico y 512MB RAM).
               </div>
             </div>
+            <span class="motor-check" id="check-motor-cloud" style="font-size: 18px; color: #2563eb; font-weight: 700; display: none;">✓</span>
           </div>
         </div>
 
