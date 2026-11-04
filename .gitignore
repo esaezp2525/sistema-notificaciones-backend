@@ -5,6 +5,8 @@ __pycache__/
 *.pyo
 whatsapp_session/
 *.zip
+Sistema Notificaciones/
+server_debug.log
 node_modules/
 .system_generated/
 scratch/
