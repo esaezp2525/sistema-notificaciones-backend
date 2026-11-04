@@ -21,3 +21,4 @@ echo [OK] El motor de WhatsApp se ha detenido con exito.
 echo.
 ping -n 2 127.0.0.1 >nul
 exit /b 0
+

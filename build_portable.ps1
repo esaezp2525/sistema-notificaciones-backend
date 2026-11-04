@@ -85,3 +85,4 @@ Write-Host "📦 Archivo ZIP local: $zipTarget"
 Write-Host "📦 Archivo ZIP en Escritorio: $desktopZip"
 Write-Host "🔗 Acceso directo en Escritorio: $lnkPath"
 Write-Host "========================================================"
+

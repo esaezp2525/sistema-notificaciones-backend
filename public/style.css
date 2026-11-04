@@ -1419,6 +1419,22 @@ body {
   border-color: #93c5fd;
 }
 
+.tag-btn-ai {
+  background: linear-gradient(135deg, #4f46e5, #0284c7) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-weight: 600 !important;
+  font-family: inherit !important;
+  box-shadow: 0 1px 3px rgba(79, 70, 229, 0.3);
+  transition: all 0.2s ease;
+}
+
+.tag-btn-ai:hover {
+  background: linear-gradient(135deg, #4338ca, #0369a1) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(79, 70, 229, 0.4);
+}
+
 /* BOTONES DE DIÁLOGOS Y MODALES */
 .btn-dialog {
   font-family: inherit;

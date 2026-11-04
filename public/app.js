@@ -3019,11 +3019,19 @@ window.abrirTabChatIA = function() {
   const tabBtn = document.querySelector('.tab-item[data-tab="tab-plantillas"]');
   if (tabBtn) tabBtn.click();
   const btnSubnavChat = document.getElementById('btn-subnav-chat');
-  if (btnSubnavChat) btnSubnavChat.click();
+  const splitContainer = document.getElementById('plantillas-split-container');
+  if (btnSubnavChat) {
+    btnSubnavChat.classList.add('active');
+    document.getElementById('btn-subnav-catalogo')?.classList.remove('active');
+    splitContainer?.classList.add('show-chat');
+  }
   setTimeout(() => {
     const chatInput = document.getElementById('asistente-chat-input');
-    if (chatInput) chatInput.focus();
-  }, 150);
+    if (chatInput) {
+      chatInput.focus();
+      chatInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, 120);
 };
 
 window.generarEnModalDesdeChip = function(modalType, promptKey) {
@@ -3033,6 +3041,8 @@ window.generarEnModalDesdeChip = function(modalType, promptKey) {
   else if (promptKey === 'previred') promptText = 'Aviso de pago de cotizaciones previsionales en Previred';
   else if (promptKey === 'cierre') promptText = 'Solicitud de facturas y cartolas para cierre contable mensual';
   else if (promptKey === 'honorarios') promptText = 'Cobro formal de honorarios contables mensuales';
+  else if (promptKey === 'patente') promptText = 'Aviso de vencimiento de patente municipal comercial';
+  else if (promptKey === 'renta') promptText = 'Declaración anual Operación Renta F22 y balances';
   else if (promptKey === 'decorativos') {
     promptText = 'Plantilla solo con marcos decorativos, separadores y emojis';
     modo = 'decorativos';
@@ -3042,22 +3052,55 @@ window.generarEnModalDesdeChip = function(modalType, promptKey) {
     modo = 'decorativos';
   }
 
+  const isNotif = modalType === 'notif';
+  const modoRadio = document.querySelector(`input[name="modal-${isNotif ? 'notif' : 'plan'}-ia-modo"]:checked`);
+  if (modoRadio && modoRadio.value === 'decorativos') {
+    modo = 'decorativos';
+  }
+
   const res = generarPlantillaConIA(promptText, modo);
   aplicarResultadoIAEnModal(modalType, res);
 };
 
 window.generarEnModalConInput = function(modalType) {
-  const inputId = modalType === 'notif' ? 'modal-notif-ai-input' : 'modal-plantilla-ai-input';
-  const inputEl = document.getElementById(inputId);
+  const isNotif = modalType === 'notif';
+  const inputEl = document.getElementById(isNotif ? 'modal-notif-ia-input' : 'modal-plan-ia-input')
+    || document.getElementById(isNotif ? 'modal-notif-ai-input' : 'modal-plantilla-ai-input')
+    || document.getElementById('modal-plan-ia-input')
+    || document.getElementById('modal-notif-ia-input');
+
   const promptText = inputEl ? inputEl.value.trim() : '';
   if (!promptText) {
     showToast('Escribe una instrucción para el Asistente IA o elige un botón rápido.', 'info');
+    if (inputEl) inputEl.focus();
     return;
   }
-  const modo = (promptText.toLowerCase().includes('marco') || promptText.toLowerCase().includes('decorat') || promptText.toLowerCase().includes('emoji')) ? 'decorativos' : 'completo';
+
+  const modoRadio = document.querySelector(`input[name="modal-${isNotif ? 'notif' : 'plan'}-ia-modo"]:checked`);
+  let modo = modoRadio ? modoRadio.value : 'completo';
+  if (promptText.toLowerCase().includes('marco') || promptText.toLowerCase().includes('decorat') || promptText.toLowerCase().includes('emoji')) {
+    modo = 'decorativos';
+  }
+
   const res = generarPlantillaConIA(promptText, modo);
   aplicarResultadoIAEnModal(modalType, res);
   if (inputEl) inputEl.value = '';
+};
+
+window.mejorarTextoConIA = function(textareaId) {
+  const txt = document.getElementById(textareaId);
+  if (!txt) return;
+  const actual = txt.value.trim();
+  if (!actual) {
+    showToast('Escribe primero un borrador o usa los botones de arriba para generar con IA.', 'info');
+    txt.focus();
+    return;
+  }
+
+  const res = generarPlantillaConIA(actual, 'completo');
+  txt.value = res.cuerpo;
+  txt.focus();
+  showToast('✨ Mensaje mejorado y formateado con éxito por la IA.', 'success');
 };
 
 function aplicarResultadoIAEnModal(modalType, res) {

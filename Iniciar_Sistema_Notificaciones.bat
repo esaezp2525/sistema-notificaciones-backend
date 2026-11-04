@@ -98,3 +98,4 @@ echo   Sesion de WhatsApp permanente en este equipo.
 echo ========================================================
 ping -n 2 127.0.0.1 >nul
 exit /b 0
+

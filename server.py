@@ -382,65 +382,68 @@ def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío", empres
                     page.keyboard.press("Backspace")
                     time.sleep(0.2)
                     page.keyboard.insert_text(nombre_dest)
-                    time.sleep(2.2)
+                    time.sleep(2.0)
 
-                    # 2. Localizar y hacer clic en el chat o grupo dentro de #pane-side (insensible a mayúsculas y tildes)
-                    clicked = page.evaluate("""(targetName) => {
-                        const norm = (s) => (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
-                        const target = norm(targetName);
-                        if (!target) return false;
+                    # 2. Localizar y abrir la conversación con soporte multiruta para WhatsApp Web
+                    opened = False
 
-                        const pane = document.querySelector('#pane-side') || document;
-                        const candidates = Array.from(pane.querySelectorAll(
-                            "span[title], span[dir='auto'], div[role='listitem'], div[role='row'], div[data-testid='cell-frame-container']"
-                        ));
+                    # Estrategia A: Clic con Playwright nativo sobre el resultado por título o texto
+                    target_loc = page.locator(
+                        f"#pane-side span[title='{nombre_dest}'], "
+                        f"#side span[title='{nombre_dest}'], "
+                        f"#pane-side div[data-testid='cell-frame-title']:has-text('{nombre_dest}'), "
+                        f"#pane-side div[role='row']:has-text('{nombre_dest}'), "
+                        f"#pane-side div[data-testid='cell-frame-container']:has-text('{nombre_dest}')"
+                    ).first
 
-                        // 1° Coincidencia exacta por atributo title o texto
-                        for (const el of candidates) {
-                            const tAttr = norm(el.getAttribute && el.getAttribute('title'));
-                            if (tAttr && tAttr === target) {
-                                const row = el.closest("[role='listitem'], [role='row'], [data-testid='cell-frame-container']") || el;
-                                row.click();
-                                return true;
-                            }
-                        }
-                        // 2° Coincidencia parcial por atributo title
-                        for (const el of candidates) {
-                            const tAttr = norm(el.getAttribute && el.getAttribute('title'));
-                            if (tAttr && (tAttr.includes(target) || target.includes(tAttr)) && tAttr.length >= 2) {
-                                const row = el.closest("[role='listitem'], [role='row'], [data-testid='cell-frame-container']") || el;
-                                row.click();
-                                return true;
-                            }
-                        }
-                        // 3° Coincidencia por texto visible dentro de las filas de resultados
-                        const rows = Array.from(pane.querySelectorAll("[role='listitem'], [role='row'], [data-testid='cell-frame-container']"));
-                        for (const r of rows) {
-                            const txt = norm(r.innerText || '');
-                            if (txt && txt.includes(target)) {
-                                r.click();
-                                return true;
-                            }
-                        }
-                        return false;
-                    }""", nombre_dest)
+                    if target_loc.count() > 0 and target_loc.is_visible():
+                        try:
+                            target_loc.click(timeout=4000)
+                            time.sleep(1.2)
+                            if page.locator("footer div[contenteditable='true'], footer div[role='textbox']").count() > 0:
+                                opened = True
+                        except Exception:
+                            pass
 
-                    if not clicked:
-                        # Intentar presionar Enter en la caja de búsqueda por si WhatsApp seleccionó el primer resultado
+                    # Estrategia B: Presionar Enter en la barra de búsqueda (WhatsApp abre el primer resultado coincidente)
+                    if not opened:
                         page.keyboard.press("Enter")
-                        time.sleep(1.2)
-                        has_footer = page.locator("footer div[contenteditable='true'], footer div[role='textbox']").count() > 0
-                        if not has_footer:
-                            add_log("error", f"❌ '{nombre_dest}' no fue encontrado en WhatsApp.")
-                            database.db_actualizar_estado_destinatario(dest_id, "No Encontrado")
-                            automation_state["fallidos"] += 1
-                            page.keyboard.press("Escape")
-                            time.sleep(1)
-                            continue
-                    else:
-                        time.sleep(1.5)
+                        time.sleep(1.4)
+                        if page.locator("footer div[contenteditable='true'], footer div[role='textbox']").count() > 0:
+                            opened = True
 
-                    # 3. Preparar mensaje con variables
+                    # Estrategia C: Clic en coordenadas físicas reales del elemento de resultado
+                    if not opened:
+                        coords = page.evaluate("""(targetName) => {
+                            const norm = (s) => (s || '').toString().trim().toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '');
+                            const target = norm(targetName);
+                            const pane = document.querySelector('#pane-side') || document;
+                            const items = Array.from(pane.querySelectorAll("span[title], div[data-testid='cell-frame-title'], div[role='row']"));
+                            for (const el of items) {
+                                const t = norm(el.getAttribute('title') || el.innerText || '');
+                                if (t && (t === target || t.includes(target) || target.includes(t))) {
+                                    const r = el.getBoundingClientRect();
+                                    return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+                                }
+                            }
+                            return null;
+                        }""", nombre_dest)
+                        if coords:
+                            page.mouse.click(coords['x'], coords['y'])
+                            time.sleep(1.5)
+                            if page.locator("footer div[contenteditable='true'], footer div[role='textbox']").count() > 0:
+                                opened = True
+
+                    # Si tras las 3 estrategias la conversación no abrió la caja de mensaje
+                    if not opened:
+                        add_log("error", f"❌ '{nombre_dest}' no fue encontrado en WhatsApp.")
+                        database.db_actualizar_estado_destinatario(dest_id, "No Encontrado")
+                        automation_state["fallidos"] += 1
+                        page.keyboard.press("Escape")
+                        time.sleep(1)
+                        continue
+
+                    # 3. Preparar mensaje con reemplazo de variables
                     ahora_dt = datetime.now()
                     msg_final = plantilla_cuerpo
                     msg_final = msg_final.replace("{nombre}", nombre_dest)
@@ -450,14 +453,22 @@ def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío", empres
                     msg_final = msg_final.replace("{hora}", ahora_dt.strftime("%H:%M"))
                     msg_final = msg_final.replace("{dia}", str(ahora_dt.day))
 
-                    # 4. Enviar mensaje
+                    # 4. Escribir y enviar mensaje con soporte para saltos de línea (Shift+Enter)
                     caja_msg = page.locator("footer div[data-testid='conversation-compose-box-input'], footer div[contenteditable='true'], footer div[role='textbox'], footer div[data-tab='10']").first
                     caja_msg.click(timeout=8000)
-                    time.sleep(0.4)
-                    page.keyboard.insert_text(msg_final)
-                    time.sleep(1.0)
+                    time.sleep(0.3)
 
-                    btn_send = page.locator("button[aria-label='Enviar'], button[data-tab='11'], span[data-icon='wds-ic-send-filled'], button:has([data-icon*='send']), button[data-testid='send']").first
+                    lineas_msg = msg_final.split("\n")
+                    for idx_linea, linea_txt in enumerate(lineas_msg):
+                        if linea_txt:
+                            page.keyboard.insert_text(linea_txt)
+                        if idx_linea < len(lineas_msg) - 1:
+                            page.keyboard.down("Shift")
+                            page.keyboard.press("Enter")
+                            page.keyboard.up("Shift")
+                    time.sleep(0.8)
+
+                    btn_send = page.locator("button[aria-label='Enviar'], button[data-tab='11'], span[data-icon='wds-ic-send-filled'], button:has([data-icon*='send']), button[data-testid='send'], span[data-icon='send']").first
                     if btn_send.is_visible():
                         btn_send.click(timeout=3000)
                     else:
@@ -524,6 +535,14 @@ def automation_worker(auto_id=None, dest_ids=None, nombre_tarea="Envío", empres
         add_log("success", f"Proceso concluido. Entregados: {automation_state['enviados']}, Incidencias: {automation_state['fallidos']}")
     except Exception as e:
         add_log("error", f"Error general: {e}")
+
+    # Si fue una automatización programada y no se logró enviar ningún mensaje (0 entregados),
+    # liberar el periodo para que no quede bloqueada y pueda reintentar
+    if auto_id and automation_state.get("enviados", 0) == 0:
+        try:
+            database.db_actualizar_periodo_auto(auto_id, "")
+        except Exception:
+            pass
 
     automation_state["is_running"] = False
     automation_state["current_client"] = ""
@@ -987,12 +1006,14 @@ def reiniciar_estados():
         conn = database.get_db_connection()
         if empresa_id:
             conn.execute("UPDATE destinatarios SET estado_envio = 'Pendiente', fecha_envio = '' WHERE empresa_id = ?", (empresa_id.strip().lower(),))
+            conn.execute("UPDATE automatizaciones SET ultimo_envio_periodo = '' WHERE empresa_id = ?", (empresa_id.strip().lower(),))
         else:
             conn.execute("UPDATE destinatarios SET estado_envio = 'Pendiente', fecha_envio = ''")
+            conn.execute("UPDATE automatizaciones SET ultimo_envio_periodo = ''")
         conn.commit()
         conn.close()
         database.db_sincronizar_a_excel()
-        add_log("info", f"Estados de envío reiniciados a 'Pendiente' ({empresa_id or 'todas'}).")
+        add_log("info", f"Estados de envío y periodos reiniciados a 'Pendiente' ({empresa_id or 'todas'}).")
         return jsonify({"success": True})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

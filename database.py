@@ -752,11 +752,22 @@ def db_guardar_automatizacion(aid, nombre, mensaje_id, dia_mes, modalidad_dia, h
             num += 1
         aid = f"auto_{num}"
 
+    # Si la automatización ya existía pero se modificó su hora o día, reiniciar último periodo
+    # para permitir que el nuevo horario programado por el usuario se ejecute de inmediato
+    cursor.execute("SELECT hora, dia_mes, modalidad_dia, ultimo_envio_periodo FROM automatizaciones WHERE id = ?", (aid,))
+    prev = cursor.fetchone()
+    ultimo_periodo = ''
+    if prev:
+        if str(prev["hora"]).strip() == hora.strip() and int(prev["dia_mes"]) == int(dia_mes) and str(prev["modalidad_dia"]) == str(modalidad_dia):
+            ultimo_periodo = prev["ultimo_envio_periodo"] or ''
+        else:
+            ultimo_periodo = ''
+
     cursor.execute(
         """INSERT OR REPLACE INTO automatizaciones 
         (id, nombre, mensaje_id, dia_mes, modalidad_dia, hora, activo, repetir_mensual, ultimo_envio_periodo, empresa_id) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT ultimo_envio_periodo FROM automatizaciones WHERE id = ?), ''), ?)""",
-        (aid, nombre.strip(), mensaje_id, int(dia_mes), modalidad_dia, hora.strip(), 1 if activo else 0, 1 if repetir_mensual else 0, aid, empresa_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (aid, nombre.strip(), mensaje_id, int(dia_mes), modalidad_dia, hora.strip(), 1 if activo else 0, 1 if repetir_mensual else 0, ultimo_periodo, empresa_id)
     )
     conn.commit()
     conn.close()
