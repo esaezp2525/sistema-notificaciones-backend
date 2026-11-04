@@ -108,36 +108,57 @@ window.seleccionarPresetMotor = function(preset) {
   const hintEl = document.getElementById('motor-hint-text');
 
   if (preset === 'local') {
-    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-      solicitarConfirmacion(
-        'Abrir en Motor Local (PC)',
-        'Para utilizar el motor local de tu computador con almacenamiento ilimitado y sesión permanente, la aplicación se abrirá en http://localhost:5829. ¿Deseas abrirla ahora?',
-        () => {
-          window.location.href = 'http://localhost:5829';
-        }
-      );
-      return;
-    }
     if (inputEl) inputEl.value = 'http://localhost:5829';
-    if (hintEl) hintEl.textContent = 'Motor local activo en tu computador (localhost:5829).';
     if (cardLocal) {
       cardLocal.style.border = '2px solid #16a34a';
       cardLocal.style.background = '#f0fdf4';
+      const check = document.getElementById('check-motor-local');
+      if (check) check.style.display = 'block';
     }
     if (cardCloud) {
       cardCloud.style.border = '1.5px solid #cbd5e1';
-      cardCloud.style.background = '#f8fafc';
+      cardCloud.style.background = '#ffffff';
+      const check = document.getElementById('check-motor-cloud');
+      if (check) check.style.display = 'none';
+    }
+
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      if (hintEl) {
+        hintEl.innerHTML = `
+          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px; margin-top: 8px;">
+            <div style="font-weight: 700; color: #15803d; font-size: 13px; margin-bottom: 4px;">
+              💻 Motor Local Seleccionado (Tu PC)
+            </div>
+            <div style="font-size: 12px; color: #166534; line-height: 1.4;">
+              Para que tu navegador se comunique con WhatsApp Web local sin restricciones de seguridad HTTPS, haz clic abajo para abrir la aplicación directamente en tu PC:
+            </div>
+            <a href="http://localhost:5829" style="display: inline-block; margin-top: 8px; background: #16a34a; color: white; padding: 6px 14px; border-radius: 6px; font-weight: 700; font-size: 12px; text-decoration: none;">
+              🚀 Abrir en localhost:5829
+            </a>
+          </div>
+        `;
+      }
+    } else {
+      if (hintEl) {
+        hintEl.innerHTML = '<span style="color: #16a34a; font-weight: 700;">✅ Motor local activo en tu computador (localhost:5829).</span>';
+      }
     }
   } else {
     if (inputEl) inputEl.value = DEFAULT_CLOUD_API;
-    if (hintEl) hintEl.textContent = 'Motor en la nube activo (Render).';
+    if (hintEl) {
+      hintEl.innerHTML = '<span style="color: #2563eb; font-weight: 600;">☁️ Motor en la nube activo (Render).</span>';
+    }
     if (cardCloud) {
       cardCloud.style.border = '2px solid #2563eb';
       cardCloud.style.background = '#eff6ff';
+      const check = document.getElementById('check-motor-cloud');
+      if (check) check.style.display = 'block';
     }
     if (cardLocal) {
       cardLocal.style.border = '1.5px solid #cbd5e1';
       cardLocal.style.background = '#ffffff';
+      const check = document.getElementById('check-motor-local');
+      if (check) check.style.display = 'none';
     }
   }
 };
@@ -623,8 +644,18 @@ function setupEventListeners() {
     apiUrl = document.getElementById('input-api-url').value.trim();
     localStorage.setItem(STORAGE_KEY_API, apiUrl);
     actualizarEstadoMotorUI();
-    showToast('Configuración de motor guardada.', 'success');
     cerrarModal('modal-config-servidor');
+
+    const isLocal = apiUrl.includes('localhost') || apiUrl.includes('127.0.0.1');
+    if (isLocal && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      showToast('Configurado motor local. Abriendo en tu PC...', 'info');
+      setTimeout(() => {
+        window.location.href = 'http://localhost:5829';
+      }, 600);
+      return;
+    }
+
+    showToast('Configuración de motor guardada.', 'success');
     cargarDatos();
     verificarEstadoWhatsApp();
   });
