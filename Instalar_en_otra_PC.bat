@@ -37,8 +37,8 @@ if not exist "venv\Scripts\python.exe" (
     exit /b 1
 )
 
-echo [2/4] Instalando librerias necesarias...
-venv\Scripts\pip.exe install -r requirements.txt --quiet
+echo [2/4] Instalando librerias necesarias (descargando componentes, por favor espera)...
+venv\Scripts\pip.exe install -r requirements.txt --no-warn-script-location
 
 echo [3/4] Descargando componentes de WhatsApp Web (Chromium)...
 venv\Scripts\playwright.exe install chromium

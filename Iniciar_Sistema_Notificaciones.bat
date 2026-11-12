@@ -46,10 +46,10 @@ if not exist "%PYTHON_EXE%" (
         exit /b 1
     )
 
-    echo [2/3] Instalando librerias de WhatsApp...
-    "%~dp0venv\Scripts\pip.exe" install -r requirements.txt --quiet
+    echo [2/3] Instalando librerias de WhatsApp (descargando componentes, por favor espera)...
+    "%~dp0venv\Scripts\pip.exe" install -r requirements.txt --no-warn-script-location
 
-    echo [3/3] Descargando componentes del navegador WhatsApp...
+    echo [3/3] Descargando navegador de WhatsApp (Chromium)...
     "%~dp0venv\Scripts\playwright.exe" install chromium
 
     echo.
