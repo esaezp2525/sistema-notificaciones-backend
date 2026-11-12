@@ -970,11 +970,9 @@ async function cargarDatos() {
         notificacionesData = data.notificaciones || [];
         automatizacionesData = data.automatizaciones || [];
         plantillasData = data.plantillas || [];
-        if (Array.isArray(data.contactos_wa) && data.contactos_wa.length > 0) {
+        if (Array.isArray(data.contactos_wa)) {
           contactosWAData = data.contactos_wa;
           localStorage.setItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`, JSON.stringify(contactosWAData));
-        } else {
-          contactosWAData = JSON.parse(localStorage.getItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`) || '[]');
         }
         if (plantillasData.length === 0) {
           plantillasData = [...DEFAULT_PLANTILLAS_CHILENAS];
@@ -1951,7 +1949,7 @@ window.sincronizarContactosWhatsApp = async function(forceRefresh = false, custo
     if (!res.ok) return;
     const data = await res.json();
 
-    if (Array.isArray(data.contactos) && data.contactos.length > 0) {
+    if (Array.isArray(data.contactos)) {
       contactosWAData = data.contactos;
       localStorage.setItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`, JSON.stringify(contactosWAData));
     }
@@ -1967,7 +1965,7 @@ window.sincronizarContactosWhatsApp = async function(forceRefresh = false, custo
             const pRes = await fetch(getApiEndpoint(`/api/whatsapp/contactos?empresa=${currentEmpresa}`));
             if (!pRes.ok) return;
             const pData = await pRes.json();
-            if (Array.isArray(pData.contactos) && pData.contactos.length > 0) {
+            if (Array.isArray(pData.contactos)) {
               contactosWAData = pData.contactos;
               localStorage.setItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`, JSON.stringify(contactosWAData));
             }
@@ -1992,6 +1990,25 @@ window.sincronizarContactosWhatsApp = async function(forceRefresh = false, custo
     waSyncingInProgress = false;
     renderListaContactosWA();
   }
+};
+
+window.limpiarYReescanearContactosWA = async function() {
+  solicitarConfirmacion(
+    '¿Limpiar y Re-escanear WhatsApp?',
+    'Esto vaciará los contactos guardados y leerá únicamente los chats del teléfono WhatsApp que esté conectado actualmente.',
+    async () => {
+      try {
+        contactosWAData = [];
+        localStorage.removeItem(`${STORAGE_KEY_WA_CONTACTS}_${currentEmpresa}`);
+        renderListaContactosWA();
+        await fetch(getApiEndpoint(`/api/whatsapp/contactos/limpiar?empresa=${currentEmpresa}`), { method: 'POST' });
+        showToast('Lista limpiada. Leyendo chats del WhatsApp actual...', 'info');
+        sincronizarContactosWhatsApp(true);
+      } catch (e) {
+        showToast('Error al vaciar contactos', 'error');
+      }
+    }
+  );
 };
 
 window.editarDestinatario = function(id) {

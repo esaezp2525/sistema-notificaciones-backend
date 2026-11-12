@@ -472,9 +472,14 @@
               <strong style="font-size: 13px; color: #0f172a;">Disponible en WhatsApp (<span id="wa-list-empresa-label">Contidep</span>)</strong>
               <span id="wa-list-count-badge" style="background: #dcfce7; color: #15803d; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">0</span>
             </div>
-            <button type="button" id="btn-refresh-wa-contactos" onclick="sincronizarContactosWhatsApp(true)" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-              🔄 Actualizar lista
-            </button>
+            <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+              <button type="button" id="btn-refresh-wa-contactos" onclick="sincronizarContactosWhatsApp(true)" title="Actualizar lista desde tu WhatsApp" style="background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; border-radius: 6px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                🔄 Actualizar lista
+              </button>
+              <button type="button" id="btn-limpiar-wa-contactos" onclick="limpiarYReescanearContactosWA()" title="Borra contactos anteriores y lee únicamente los chats del teléfono conectado ahora" style="background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; padding: 4px 10px; font-size: 11.5px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                🧹 Limpiar y Re-escanear
+              </button>
+            </div>
           </div>
 
           <!-- Buscador y Filtros de Lista WhatsApp -->

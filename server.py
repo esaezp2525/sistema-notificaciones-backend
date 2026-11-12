@@ -1391,7 +1391,7 @@ def extraer_contactos_en_pagina(page, skip_scroll=False, skip_idb=False):
         print(f"[WA Extract] Error extrayendo contactos: {e}")
     return []
 
-def extraer_y_guardar_contactos_wa(page, empresa_id="contidep", search_query=None):
+def extraer_y_guardar_contactos_wa(page, empresa_id="contidep", search_query=None, replace_all=False):
     safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     detectados = extraer_contactos_en_pagina(page)
     if search_query:
@@ -1404,12 +1404,12 @@ def extraer_y_guardar_contactos_wa(page, empresa_id="contidep", search_query=Non
         buscados_p = ejecutar_busqueda_en_barra_wa(page, pending_q)
         if buscados_p:
             detectados.extend(buscados_p)
-    if detectados:
-        database.db_guardar_contactos_wa(detectados, empresa_id=safe_empresa, replace_all=False)
+    if detectados or replace_all:
+        database.db_guardar_contactos_wa(detectados, empresa_id=safe_empresa, replace_all=replace_all)
         wa_contactos_sync_state[safe_empresa]["last_sync"] = time.time()
     return database.db_obtener_contactos_wa(empresa_id=safe_empresa)
 
-def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatarios=False, search_query=None):
+def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatarios=False, search_query=None, replace_all=False):
     safe_empresa = "medcapital" if str(empresa_id).lower() == "medcapital" else "contidep"
     global whatsapp_autenticado
     if wa_contactos_sync_state[safe_empresa]["is_syncing"]:
@@ -1501,11 +1501,14 @@ def sincronizar_contactos_wa_worker(empresa_id="contidep", importar_a_destinatar
                             f"Buscando '{search_query}' en tus chats de WhatsApp..."
                             if search_query else f"Extrayendo grupos y contactos de {safe_empresa.title()}..."
                         )
+                        is_first_pass = True
                         for attempt_idx in range(8):
                             page.wait_for_timeout(1800)
                             wa_contactos_sync_state[safe_empresa]["last_attempt"] = time.time()
                             q_now = search_query if attempt_idx == 0 else None
-                            detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=q_now)
+                            replace_now = (is_first_pass and search_query is None) or replace_all
+                            detectados = extraer_y_guardar_contactos_wa(page, safe_empresa, search_query=q_now, replace_all=replace_now)
+                            is_first_pass = False
                             if len(detectados) > 0 and not wa_contactos_sync_state[safe_empresa].get("pending_query"):
                                 break
                         capturar_diagnostico_wa(page, safe_empresa, f"sync-ready ({len(detectados)} contactos)")
@@ -1563,15 +1566,18 @@ def api_whatsapp_contactos():
     last_attempt = wa_contactos_sync_state[safe_empresa].get("last_attempt", 0)
     cooldown_passed = (time.time() - last_attempt) > 90
 
+    clean = request.args.get("clean", "0") in ("1", "true") or bool(data.get("clean", False))
+
     if search_query and is_syncing:
         wa_contactos_sync_state[safe_empresa]["pending_query"] = search_query
 
     # Disparar sincronización si pide refresh, si busca en vivo (q), o si no hay contactos y pasó el cooldown
-    should_start = refresh or bool(search_query) or (len(contactos) == 0 and cooldown_passed)
+    should_start = refresh or clean or bool(search_query) or (len(contactos) == 0 and cooldown_passed)
     if is_auth and should_start and not is_syncing and not qr_state[safe_empresa]["is_active"] and not automation_state["is_running"]:
+        replace_sync = clean or (refresh and not bool(search_query))
         t = threading.Thread(
             target=sincronizar_contactos_wa_worker,
-            kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": False, "search_query": search_query or None},
+            kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": False, "search_query": search_query or None, "replace_all": replace_sync},
             daemon=True
         )
         t.start()
@@ -1599,14 +1605,28 @@ def escanear_whatsapp():
     safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
     importar = bool(data.get("importar", False))
     search_query = str(data.get("q") or "").strip() or None
+    clean = bool(data.get("clean", False) or data.get("replace_all", False))
+    replace_sync = clean or (search_query is None)
 
     t = threading.Thread(
         target=sincronizar_contactos_wa_worker,
-        kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": importar, "search_query": search_query},
+        kwargs={"empresa_id": safe_empresa, "importar_a_destinatarios": importar, "search_query": search_query, "replace_all": replace_sync},
         daemon=True
     )
     t.start()
     return jsonify({"success": True, "message": f"Sincronizando contactos y grupos de {safe_empresa.title()}..."})
+
+@app.route("/api/whatsapp/contactos/limpiar", methods=["POST"])
+def limpiar_contactos_wa_api():
+    try:
+        data = request.get_json(silent=True) or {}
+        empresa = request.args.get("empresa") or data.get("empresa", "contidep")
+        safe_empresa = "medcapital" if str(empresa).lower() == "medcapital" else "contidep"
+        database.db_limpiar_contactos_wa(safe_empresa)
+        add_log("info", f"[{safe_empresa.title()}] Lista de contactos de WhatsApp vaciada.")
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # ==================== TRANSMISIÓN DE CÓDIGO QR EN VIVO (MULTI-EMPRESA) ====================
 qr_state = {
@@ -1799,6 +1819,8 @@ def qr_worker(empresa_id="contidep", run_id=0):
                                 qr_state[safe_empresa]["qr_base64"] = None
                                 qr_state[safe_empresa]["is_active"] = False
                         add_log("success", f"✅ WhatsApp Web [{safe_empresa.title()}] vinculado y conectado exitosamente.")
+                        # Limpiar contactos del teléfono anterior para que solo aparezcan los del nuevo WhatsApp vinculado
+                        database.db_limpiar_contactos_wa(safe_empresa)
                         # Esperar en segundo plano a que WhatsApp Web descargue la lista de chats (#pane-side) antes de leer IndexedDB y cerrar
                         try:
                             total_extraidos = 0

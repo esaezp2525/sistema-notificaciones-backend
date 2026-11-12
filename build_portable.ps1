@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $baseDir = 'c:\desarrollo\Sole'
 $portableDir = Join-Path $baseDir 'Sistema Notificaciones'
 $zipTarget = Join-Path $baseDir 'Sistema Notificaciones.zip'
@@ -47,6 +47,13 @@ foreach ($f in $filesToCopy) {
 
 # Crear acceso directo alternativo con el nombre exacto
 Copy-Item -Force (Join-Path $portableDir 'Iniciar_Sistema_Notificaciones.bat') (Join-Path $portableDir 'Sistema_Notificaciones.bat')
+
+# Limpiar contactos previos de WhatsApp en la base de datos portable para proteger la privacidad
+$portableDb = Join-Path $portableDir 'sistema_notificaciones.db'
+if (Test-Path $portableDb) {
+    $pyCmd = if (Test-Path (Join-Path $baseDir 'venv\Scripts\python.exe')) { Join-Path $baseDir 'venv\Scripts\python.exe' } else { 'python' }
+    & $pyCmd -c "import sqlite3; conn = sqlite3.connect(r'$portableDb'); conn.execute('DELETE FROM contactos_whatsapp'); conn.commit(); conn.close(); print('[PORTABLE] Contactos de WhatsApp limpiados de la base de datos para nueva instalacion.')"
+}
 
 # 3. Copiar carpetas web
 Copy-Item -Recurse -Force (Join-Path $baseDir 'static') (Join-Path $portableDir 'static')
